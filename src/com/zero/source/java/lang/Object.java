@@ -624,6 +624,7 @@ public class Object {
      */
     // 在 GC 准备释放对象所占用的内存空间之前，它将首先调用 finalize() 方法。
     // 一般用于释放非 Java 资源（如打开的文件资源、数据库连接等）, 或是调用非 Java 方法（native 方法）时分配的内存（比如 C 语言的 malloc() 系列函数）。
+    // finalize() 方法最多只会被调用一次的特性，可以实现延长对象的生命周期
     protected void finalize() throws Throwable {
     }
 }
