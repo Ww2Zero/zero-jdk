@@ -36,7 +36,24 @@ package java.lang;
  */
 public class Object {
 
+    // 注册本地方法
+    // 注册下列本地方法：
+    //   hashCode
+    //   getClass
+    //   clone
+    //   notify
+    //   notifyAll
+    //   wait
+
+    // native修饰的方法本身就是本地方法
+    // 1. native标识符除不能与abstract联用外，可以与其它标识符联用；
+    // 2. native method方法可以返回任何java类型，包括非基本类型，也可以进行异常控制；
+    // 3. 如果含有native method方法的类被继承，子类会继承这个native method方法，也可以使用java语言重写这个方法；
+    // 4. 如果一个native method方法被final标识，它被继承后不能被重写。
+
     private static native void registerNatives();
+
+    // 在类加载时，就调用注册本地方法，方便该类中的本地方法进行调用
     static {
         registerNatives();
     }
@@ -97,6 +114,15 @@ public class Object {
      * @see     java.lang.Object#equals(java.lang.Object)
      * @see     java.lang.System#identityHashCode
      */
+    // 给对象返回一个 hash code 值。这个方法被用于 hash tables，例如 HashMap
+    // 当重写equals时一般需要对该方法（hashcode）进行重写
+    //
+    // hashcode主要用于快速定位对象的位置
+    // 在对象放在不可以重复的结构（hashMap）中时，先进行hashcode的定位比较，在进行equals的比较
+    //
+    // Java 对象的 equals 方法和 hashCode 方法是这样规定的：
+    // 1、相等（相同）的对象必须具有相等的哈希码（或者散列码）。
+    // 2、如果两个对象的 hashCode 相同，它们并不一定相同。
     public native int hashCode();
 
     /**
@@ -145,6 +171,13 @@ public class Object {
      * @see     #hashCode()
      * @see     java.util.HashMap
      */
+
+    // 判断其他的对象是否和该对象相等  --比较对象的地址（即对象引用）
+    // 基础数据类型时 可以直接用于对值的比较
+    // 其他对象需要进行内容的比较时，需要对该方法进行重写
+
+    // '=='只能比较对象的地址
+    // equals默认也是比较对象的地址，需要进行重写才可以实现比较对象内容
     public boolean equals(Object obj) {
         return (this == obj);
     }
@@ -209,6 +242,7 @@ public class Object {
      *               be cloned.
      * @see java.lang.Cloneable
      */
+
     protected native Object clone() throws CloneNotSupportedException;
 
     /**
