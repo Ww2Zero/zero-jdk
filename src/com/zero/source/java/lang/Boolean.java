@@ -40,6 +40,8 @@ package java.lang;
  * @author  Arthur van Hoff
  * @since   JDK1.0
  */
+// boolean的包装类
+// 实现Serializable和Comparable接口
 public final class Boolean implements java.io.Serializable,
                                       Comparable<Boolean>
 {
@@ -47,12 +49,14 @@ public final class Boolean implements java.io.Serializable,
      * The {@code Boolean} object corresponding to the primitive
      * value {@code true}.
      */
+    // true对应的包装对象TRUE
     public static final Boolean TRUE = new Boolean(true);
 
     /**
      * The {@code Boolean} object corresponding to the primitive
      * value {@code false}.
      */
+    // false对应包装对象FALSE
     public static final Boolean FALSE = new Boolean(false);
 
     /**
@@ -68,6 +72,7 @@ public final class Boolean implements java.io.Serializable,
      *
      * @serial
      */
+    // 采用基础数据类型 boolean存储对象值
     private final boolean value;
 
     /** use serialVersionUID from JDK 1.0.2 for interoperability */
@@ -84,6 +89,7 @@ public final class Boolean implements java.io.Serializable,
      *
      * @param   value   the value of the {@code Boolean}.
      */
+    // 通过基本类型boolean构造对象
     public Boolean(boolean value) {
         this.value = value;
     }
@@ -101,6 +107,7 @@ public final class Boolean implements java.io.Serializable,
      *
      * @param   s   the string to be converted to a {@code Boolean}.
      */
+    // 通过字符串构造对象
     public Boolean(String s) {
         this(parseBoolean(s));
     }
@@ -118,6 +125,7 @@ public final class Boolean implements java.io.Serializable,
      * @return     the boolean represented by the string argument
      * @since 1.5
      */
+    // 解析字符串s是否与"true"相等
     public static boolean parseBoolean(String s) {
         return ((s != null) && s.equalsIgnoreCase("true"));
     }
@@ -128,6 +136,7 @@ public final class Boolean implements java.io.Serializable,
      *
      * @return  the primitive {@code boolean} value of this object.
      */
+    // 返回对象的基本数据类型
     public boolean booleanValue() {
         return value;
     }
@@ -146,6 +155,7 @@ public final class Boolean implements java.io.Serializable,
      * @return a {@code Boolean} instance representing {@code b}.
      * @since  1.4
      */
+    // 通过boolean构造Boolean对象
     public static Boolean valueOf(boolean b) {
         return (b ? TRUE : FALSE);
     }
@@ -159,6 +169,7 @@ public final class Boolean implements java.io.Serializable,
      * @param   s   a string.
      * @return  the {@code Boolean} value represented by the string.
      */
+    // 通过string构造Boolean对象
     public static Boolean valueOf(String s) {
         return parseBoolean(s) ? TRUE : FALSE;
     }
@@ -173,6 +184,7 @@ public final class Boolean implements java.io.Serializable,
      * @return the string representation of the specified {@code boolean}
      * @since 1.4
      */
+    // 返回b对应的字符串
     public static String toString(boolean b) {
         return b ? "true" : "false";
     }
@@ -209,6 +221,9 @@ public final class Boolean implements java.io.Serializable,
      * @return a hash code value for a {@code boolean} value.
      * @since 1.8
      */
+    //返回bool对应的hashcode
+    // true  == 1231
+    // false == 1237
     public static int hashCode(boolean value) {
         return value ? 1231 : 1237;
     }
@@ -222,6 +237,7 @@ public final class Boolean implements java.io.Serializable,
      * @return  {@code true} if the Boolean objects represent the
      *          same value; {@code false} otherwise.
      */
+    // 比较对象是否相等
     public boolean equals(Object obj) {
         if (obj instanceof Boolean) {
             return value == ((Boolean)obj).booleanValue();
@@ -287,6 +303,12 @@ public final class Boolean implements java.io.Serializable,
      *         a value greater than {@code 0} if {@code x && !y}
      * @since 1.7
      */
+
+    // x和y进行比较
+    // x = true ,y = true  则返回 0
+    // x = true ,y = false 则返回 1
+    // x = false,y = true  则返回 -1
+    // x = false,y = false 则返回 0
     public static int compare(boolean x, boolean y) {
         return (x == y) ? 0 : (x ? 1 : -1);
     }
@@ -301,6 +323,7 @@ public final class Boolean implements java.io.Serializable,
      * @see java.util.function.BinaryOperator
      * @since 1.8
      */
+    // 逻辑与，一假为假
     public static boolean logicalAnd(boolean a, boolean b) {
         return a && b;
     }
@@ -315,6 +338,7 @@ public final class Boolean implements java.io.Serializable,
      * @see java.util.function.BinaryOperator
      * @since 1.8
      */
+    // 逻辑或，一真为真
     public static boolean logicalOr(boolean a, boolean b) {
         return a || b;
     }
@@ -329,6 +353,7 @@ public final class Boolean implements java.io.Serializable,
      * @see java.util.function.BinaryOperator
      * @since 1.8
      */
+    // 逻辑异或，相同为假，不同为真
     public static boolean logicalXor(boolean a, boolean b) {
         return a ^ b;
     }
