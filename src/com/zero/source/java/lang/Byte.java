@@ -526,7 +526,7 @@ public final class Byte extends Number implements Comparable<Byte> {
      *
      * @since 1.5
      */
-    // 当前类型所占bit[位]数
+    // 当前类型所占bit[位]数  8个bit
     public static final int SIZE = 8;
 
     /**
@@ -535,7 +535,7 @@ public final class Byte extends Number implements Comparable<Byte> {
      *
      * @since 1.8
      */
-    // 当前类型所占的字节数
+    // 当前类型所占的字节数  1个字节
     public static final int BYTES = SIZE / Byte.SIZE;
 
     /** use serialVersionUID from JDK 1.1. for interoperability */
