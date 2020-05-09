@@ -73,6 +73,10 @@ package java.lang;
  * @see         java.lang.String
  * @since       1.5
  */
+
+// 字符串构造器，非线程安全。相比StringBuffer效率更高
+// 大部分方法调用AbstractStringBuilder中的实现
+
 public final class StringBuilder
     extends AbstractStringBuilder
     implements java.io.Serializable, CharSequence
@@ -85,6 +89,7 @@ public final class StringBuilder
      * Constructs a string builder with no characters in it and an
      * initial capacity of 16 characters.
      */
+    // 默认容器大小 16
     public StringBuilder() {
         super(16);
     }
