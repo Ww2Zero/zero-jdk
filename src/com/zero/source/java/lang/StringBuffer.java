@@ -94,6 +94,9 @@ import java.util.Arrays;
  * @see     java.lang.String
  * @since   JDK1.0
  */
+
+//线程安全的字符串构造器
+//在AbstractStringBuilder方法基础上添加synchronized，按照对象锁定
  public final class StringBuffer
     extends AbstractStringBuilder
     implements java.io.Serializable, CharSequence
@@ -103,6 +106,9 @@ import java.util.Arrays;
      * A cache of the last value returned by toString. Cleared
      * whenever the StringBuffer is modified.
      */
+
+    // toString时的缓存字符串，避免多次调用toString方法时，重复调用copy逻辑，节省时间
+    // transient修饰表示字段序列化时不需要考虑
     private transient char[] toStringCache;
 
     /** use serialVersionUID from JDK 1.0.2 for interoperability */
