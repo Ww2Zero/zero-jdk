@@ -14,6 +14,16 @@ public class Test {
         test04();
         test05();
 
+        test06();
+
+    }
+
+    private static void test06() {
+        String a1 = "A";
+        String a2 = "B";
+        String a3 = a1 + a2; // 在堆上分配内存
+        String a4 = "AB";
+        System.out.println("a3==a4 = " + (a3 == a4)); // false
     }
 
     private static void test05() {
