@@ -46,12 +46,14 @@ import sun.misc.DoubleConsts;
  * @author  Joseph D. Darcy
  * @since JDK1.0
  */
+// double对应的包装类
 public final class Double extends Number implements Comparable<Double> {
     /**
      * A constant holding the positive infinity of type
      * {@code double}. It is equal to the value returned by
      * {@code Double.longBitsToDouble(0x7ff0000000000000L)}.
      */
+    // 正无穷大
     public static final double POSITIVE_INFINITY = 1.0 / 0.0;
 
     /**
@@ -59,6 +61,7 @@ public final class Double extends Number implements Comparable<Double> {
      * {@code double}. It is equal to the value returned by
      * {@code Double.longBitsToDouble(0xfff0000000000000L)}.
      */
+    // 负无穷大
     public static final double NEGATIVE_INFINITY = -1.0 / 0.0;
 
     /**
@@ -66,6 +69,7 @@ public final class Double extends Number implements Comparable<Double> {
      * {@code double}. It is equivalent to the value returned by
      * {@code Double.longBitsToDouble(0x7ff8000000000000L)}.
      */
+    // 非数字
     public static final double NaN = 0.0d / 0.0;
 
     /**
@@ -76,6 +80,7 @@ public final class Double extends Number implements Comparable<Double> {
      * {@code 0x1.fffffffffffffP+1023} and also equal to
      * {@code Double.longBitsToDouble(0x7fefffffffffffffL)}.
      */
+    // double最大值：1.7976931348623157e+308
     public static final double MAX_VALUE = 0x1.fffffffffffffP+1023; // 1.7976931348623157e+308
 
     /**
@@ -86,6 +91,7 @@ public final class Double extends Number implements Comparable<Double> {
      *
      * @since 1.6
      */
+    // double最小值：2.2250738585072014E-308
     public static final double MIN_NORMAL = 0x1.0p-1022; // 2.2250738585072014E-308
 
     /**
@@ -120,6 +126,7 @@ public final class Double extends Number implements Comparable<Double> {
      *
      * @since 1.5
      */
+    // 当前类型所占bit[位]数  64bit
     public static final int SIZE = 64;
 
     /**
@@ -127,6 +134,7 @@ public final class Double extends Number implements Comparable<Double> {
      *
      * @since 1.8
      */
+    // 当前类型所占bit[位]数 8个字节
     public static final int BYTES = SIZE / Byte.SIZE;
 
     /**
@@ -200,6 +208,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @param   d   the {@code double} to be converted.
      * @return a string representation of the argument.
      */
+    // 返回对象的字符串
     public static String toString(double d) {
         return FloatingDecimal.toJavaFormatString(d);
     }
@@ -278,6 +287,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @since 1.5
      * @author Joseph D. Darcy
      */
+    // 返回浮点值的十六进制形式
     public static String toHexString(double d) {
         /*
          * Modeled after the "a" conversion specifier in C99, section
@@ -498,6 +508,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @throws     NumberFormatException  if the string does not contain a
      *             parsable number.
      */
+    // 将字符串解析为double，并进行装箱
     public static Double valueOf(String s) throws NumberFormatException {
         return new Double(parseDouble(s));
     }
@@ -515,6 +526,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @return a {@code Double} instance representing {@code d}.
      * @since  1.5
      */
+    // 装箱
     public static Double valueOf(double d) {
         return new Double(d);
     }
@@ -534,6 +546,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @see    java.lang.Double#valueOf(String)
      * @since 1.2
      */
+    // 将字符串解析为double
     public static double parseDouble(String s) throws NumberFormatException {
         return FloatingDecimal.parseDouble(s);
     }
@@ -546,6 +559,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @return  {@code true} if the value of the argument is NaN;
      *          {@code false} otherwise.
      */
+    // 判断v是否为NaN
     public static boolean isNaN(double v) {
         return (v != v);
     }
@@ -558,6 +572,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @return  {@code true} if the value of the argument is positive
      *          infinity or negative infinity; {@code false} otherwise.
      */
+    // 是否为无穷大
     public static boolean isInfinite(double v) {
         return (v == POSITIVE_INFINITY) || (v == NEGATIVE_INFINITY);
     }
@@ -572,6 +587,7 @@ public final class Double extends Number implements Comparable<Double> {
      * floating-point value, {@code false} otherwise.
      * @since 1.8
      */
+    // 判断是否有限
     public static boolean isFinite(double d) {
         return Math.abs(d) <= DoubleConsts.MAX_VALUE;
     }
@@ -604,6 +620,7 @@ public final class Double extends Number implements Comparable<Double> {
      *            parsable number.
      * @see       java.lang.Double#valueOf(java.lang.String)
      */
+    // 以字符串解析为double构造对象
     public Double(String s) throws NumberFormatException {
         value = parseDouble(s);
     }
@@ -750,6 +767,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @return a hash code value for a {@code double} value.
      * @since 1.8
      */
+    // 重写hashcode
     public static int hashCode(double value) {
         long bits = doubleToLongBits(value);
         return (int)(bits ^ (bits >>> 32));
@@ -832,6 +850,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @param   value   a {@code double} precision floating-point number.
      * @return the bits that represent the floating-point number.
      */
+    // 计算value的二进制格式，然后返回该二进制格式表示的long
     public static long doubleToLongBits(double value) {
         long result = doubleToRawLongBits(value);
         // Check for NaN based on values of bit fields, maximum
@@ -942,6 +961,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @return  the {@code double} floating-point value with the same
      *          bit pattern.
      */
+    // 计算bits的二进制格式，然后返回该二进制格式表示的double
     public static native double longBitsToDouble(long bits);
 
     /**
@@ -974,6 +994,7 @@ public final class Double extends Number implements Comparable<Double> {
      *
      * @since   1.2
      */
+    // 比较大小
     public int compareTo(Double anotherDouble) {
         return Double.compare(value, anotherDouble.value);
     }
@@ -996,6 +1017,7 @@ public final class Double extends Number implements Comparable<Double> {
      *          {@code d2}.
      * @since 1.4
      */
+    // 比较double大小
     public static int compare(double d1, double d2) {
         if (d1 < d2)
             return -1;           // Neither val is NaN, thisVal is smaller
@@ -1021,6 +1043,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @see java.util.function.BinaryOperator
      * @since 1.8
      */
+    // 返回两个数之和
     public static double sum(double a, double b) {
         return a + b;
     }
@@ -1035,6 +1058,7 @@ public final class Double extends Number implements Comparable<Double> {
      * @see java.util.function.BinaryOperator
      * @since 1.8
      */
+    // 返回两个数中较大数
     public static double max(double a, double b) {
         return Math.max(a, b);
     }
@@ -1049,6 +1073,8 @@ public final class Double extends Number implements Comparable<Double> {
      * @see java.util.function.BinaryOperator
      * @since 1.8
      */
+
+    // 返回两个数中较小数
     public static double min(double a, double b) {
         return Math.min(a, b);
     }
