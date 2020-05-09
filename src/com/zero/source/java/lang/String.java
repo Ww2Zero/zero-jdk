@@ -108,9 +108,19 @@ import java.util.regex.PatternSyntaxException;
  * @since   JDK1.0
  */
 
-public final class String
-    implements java.io.Serializable, Comparable<String>, CharSequence {
+/**
+ * 定义String类，实现Serializable，Comparable，CharSequence接口，继承Object对象
+ * 采用 final 修饰，使String类不可以被继承，同时String中不提供任何修改原始字符串的方法，使String在创建以后就不可以修改。
+ * JDK1.8 采用 char[]存储数据
+ *
+ * 主要是为了 “效率” 和 “安全性” 的缘故。若 String 允许被继承, 由于它的高度被使用率, 可能会降低程序的性能，所以 String 被定义成 final。
+ * 由于字符串常量池的存在，为了更有效的管理和优化字符串常量池里的对象，将 String 设计为不可变性。
+ * 安全性考虑。因为使用字符串的场景非常多，设计成不可变可以有效的防止字符串被有意或者无意的篡改。
+ * 作为 HashMap、HashTable 等 hash 型数据 key 的必要。因为不可变的设计，jvm 底层很容易在缓存 String 对象的时候缓存其 hashcode，这样在执行效率上会大大提升。
+ */
+public final class String implements java.io.Serializable, Comparable<String>, CharSequence {
     /** The value is used for character storage. */
+    // 存放字节的数组
     private final char value[];
 
     /** Cache the hash code for the string */
@@ -126,14 +136,17 @@ public final class String
      * <a href="{@docRoot}/../platform/serialization/spec/output.html">
      * Object Serialization Specification, Section 6.2, "Stream Elements"</a>
      */
-    private static final ObjectStreamField[] serialPersistentFields =
-        new ObjectStreamField[0];
+    // serialPersistentFields 用于指定哪些字段需要被默认序列化，
+    // transient 是用于指定哪个字段不被默认序列化，对于不需要序列化的属性直接用 transient 修饰即可。
+    // 如果同时定义了 serialPersistentFields 与 transient，transient 会被忽略。
+    private static final ObjectStreamField[] serialPersistentFields = new ObjectStreamField[0];
 
     /**
      * Initializes a newly created {@code String} object so that it represents
      * an empty character sequence.  Note that use of this constructor is
      * unnecessary since Strings are immutable.
      */
+    // 构造空串
     public String() {
         this.value = "".value;
     }
@@ -148,6 +161,7 @@ public final class String
      * @param  original
      *         A {@code String}
      */
+    // 构造original的副本字符串
     public String(String original) {
         this.value = original.value;
         this.hash = original.hash;
@@ -162,6 +176,8 @@ public final class String
      * @param  value
      *         The initial value of the string
      */
+    // 根据字符数组构造字符串
+    // 将入参字符数组copy到value中
     public String(char value[]) {
         this.value = Arrays.copyOf(value, value.length);
     }
@@ -187,6 +203,7 @@ public final class String
      *          If the {@code offset} and {@code count} arguments index
      *          characters outside the bounds of the {@code value} array
      */
+    // 以字符数组的指定范围range(offset,offset+count)构造字符串
     public String(char value[], int offset, int count) {
         if (offset < 0) {
             throw new StringIndexOutOfBoundsException(offset);
@@ -235,6 +252,8 @@ public final class String
      *
      * @since  1.5
      */
+    // 从数组下标为offset开始顺序取出数组codePoints[]中count个整数
+    // 并根据此Unicode代码点所对应的字符创建一个string对象
     public String(int[] codePoints, int offset, int count) {
         if (offset < 0) {
             throw new StringIndexOutOfBoundsException(offset);
@@ -319,6 +338,7 @@ public final class String
      * @see  #String(byte[], java.nio.charset.Charset)
      * @see  #String(byte[])
      */
+    //不建议使用
     @Deprecated
     public String(byte ascii[], int hibyte, int offset, int count) {
         checkBounds(ascii, offset, count);
@@ -367,6 +387,7 @@ public final class String
      * @see  #String(byte[], java.nio.charset.Charset)
      * @see  #String(byte[])
      */
+    //不建议使用
     @Deprecated
     public String(byte ascii[], int hibyte) {
         this(ascii, hibyte, 0, ascii.length);
@@ -418,6 +439,15 @@ public final class String
      *
      * @since  JDK1.1
      */
+
+    // byte是网络传输或存储的序列化形式,
+    // 所以在很多传输和存储的过程中需要将byte[]数组和String进行相互转化,
+    // byte是字节,char是字符,字节流和字符流需要指定编码,不然可能会乱码,
+    // bytes字节流是使用charset进行编码的,想要将他转换成unicode的char[]数组,
+    // 而又保证不出现乱码,那就要指定其解码方法
+
+    // 以指定编码解码字节数组的指定范围的字节序列，构造为字符串
+    // 字符串的默认编码 "ISO-8859-1"
     public String(byte bytes[], int offset, int length, String charsetName)
             throws UnsupportedEncodingException {
         if (charsetName == null)
@@ -456,6 +486,7 @@ public final class String
      *
      * @since  1.6
      */
+    // 以指定编码解码字节数组的指定范围的字节序列，构造为字符串
     public String(byte bytes[], int offset, int length, Charset charset) {
         if (charset == null)
             throw new NullPointerException("charset");
@@ -486,6 +517,7 @@ public final class String
      *
      * @since  JDK1.1
      */
+    // 以指定编码解码字节数组为字节序列，构造为字符串
     public String(byte bytes[], String charsetName)
             throws UnsupportedEncodingException {
         this(bytes, 0, bytes.length, charsetName);
@@ -511,6 +543,7 @@ public final class String
      *
      * @since  1.6
      */
+    // 以指定编码解码字节数组为字节序列，构造为字符串
     public String(byte bytes[], Charset charset) {
         this(bytes, 0, bytes.length, charset);
     }
@@ -541,6 +574,7 @@ public final class String
      *
      * @since  JDK1.1
      */
+    // 以JVM默认字符编码格式解码字节数组为字节序列，构造为字符串
     public String(byte bytes[], int offset, int length) {
         checkBounds(bytes, offset, length);
         this.value = StringCoding.decode(bytes, offset, length);
@@ -562,6 +596,7 @@ public final class String
      *
      * @since  JDK1.1
      */
+    // 以JVM默认字符编码格式解码字节数组为字节序列，构造为字符串
     public String(byte bytes[]) {
         this(bytes, 0, bytes.length);
     }
@@ -575,6 +610,8 @@ public final class String
      * @param  buffer
      *         A {@code StringBuffer}
      */
+    // 将buffer的动态字符串copy构造为字符串，线程安全
+    // 一般不会使用本方法，而是直接调用toString的方法
     public String(StringBuffer buffer) {
         synchronized(buffer) {
             this.value = Arrays.copyOf(buffer.getValue(), buffer.length());
@@ -596,6 +633,8 @@ public final class String
      *
      * @since  1.5
      */
+    // 将buffer的动态字符串copy构造为字符串，非线程安全
+    // 一般不会使用本方法，而是直接调用toString的方法
     public String(StringBuilder builder) {
         this.value = Arrays.copyOf(builder.getValue(), builder.length());
     }
@@ -619,6 +658,7 @@ public final class String
      * @return  the length of the sequence of characters represented by this
      *          object.
      */
+    // 返回字符数组的长度，即字符串的长度
     public int length() {
         return value.length;
     }
@@ -631,6 +671,7 @@ public final class String
      *
      * @since 1.6
      */
+    // 判断字符串是否为空字符串
     public boolean isEmpty() {
         return value.length == 0;
     }
@@ -653,6 +694,7 @@ public final class String
      *             argument is negative or not less than the length of this
      *             string.
      */
+    // 获取字符数组中指定位置的字符
     public char charAt(int index) {
         if ((index < 0) || (index >= value.length)) {
             throw new StringIndexOutOfBoundsException(index);
@@ -682,6 +724,7 @@ public final class String
      *             string.
      * @since      1.5
      */
+    // 获取字符数组中指定位置的字符的unicode 编码值(Unicode code units)
     public int codePointAt(int index) {
         if ((index < 0) || (index >= value.length)) {
             throw new StringIndexOutOfBoundsException(index);
@@ -711,6 +754,7 @@ public final class String
      *            of this string.
      * @since     1.5
      */
+    // 获取字符数组中指定位置的前一个字符的 unicode 编码值(Unicode code units)
     public int codePointBefore(int index) {
         int i = index - 1;
         if ((i < 0) || (i >= value.length)) {
@@ -740,6 +784,7 @@ public final class String
      * {@code beginIndex} is larger than {@code endIndex}.
      * @since  1.5
      */
+    //获取字符数组中开始下标和结束下标之间的代码点数
     public int codePointCount(int beginIndex, int endIndex) {
         if (beginIndex < 0 || endIndex > value.length || beginIndex > endIndex) {
             throw new IndexOutOfBoundsException();
@@ -767,6 +812,7 @@ public final class String
      *   of {@code codePointOffset} code points.
      * @since 1.5
      */
+    // 返回从开始索引处的偏移数的索引值
     public int offsetByCodePoints(int index, int codePointOffset) {
         if (index < 0 || index > value.length) {
             throw new IndexOutOfBoundsException();
@@ -779,6 +825,7 @@ public final class String
      * Copy characters from this string into dst starting at dstBegin.
      * This method doesn't perform any range checking.
      */
+    // 将字符串数组全量拷贝到dst中
     void getChars(char dst[], int dstBegin) {
         System.arraycopy(value, 0, dst, dstBegin, value.length);
     }
@@ -813,6 +860,7 @@ public final class String
      *            <li>{@code dstBegin+(srcEnd-srcBegin)} is larger than
      *                {@code dst.length}</ul>
      */
+    // 将字符串数组指定范围拷贝到dst中
     public void getChars(int srcBegin, int srcEnd, char dst[], int dstBegin) {
         if (srcBegin < 0) {
             throw new StringIndexOutOfBoundsException(srcBegin);
@@ -912,6 +960,7 @@ public final class String
      *
      * @since  JDK1.1
      */
+    // 以指定编码格式编码字符数组，返回字节数组
     public byte[] getBytes(String charsetName)
             throws UnsupportedEncodingException {
         if (charsetName == null) throw new NullPointerException();
@@ -936,6 +985,7 @@ public final class String
      *
      * @since  1.6
      */
+    // 以指定编码格式编码字符数组，返回字节数组
     public byte[] getBytes(Charset charset) {
         if (charset == null) throw new NullPointerException();
         return StringCoding.encode(charset, value, 0, value.length);
@@ -954,6 +1004,7 @@ public final class String
      *
      * @since      JDK1.1
      */
+    // 以JVM默认编码格式编码字符数组，返回字节数组
     public byte[] getBytes() {
         return StringCoding.encode(value, 0, value.length);
     }
@@ -973,6 +1024,11 @@ public final class String
      * @see  #compareTo(String)
      * @see  #equalsIgnoreCase(String)
      */
+
+    // 判断字符串是否相等
+    // 1.先比较两个字符串引用是否相等
+    // 2.比较两个字符串的长度是否相等
+    // 3.while循环依次比较每个字符
     public boolean equals(Object anObject) {
         if (this == anObject) {
             return true;
@@ -1010,10 +1066,12 @@ public final class String
      *
      * @since  1.4
      */
+    // 比较String和StringBuffer的内容是否相等
     public boolean contentEquals(StringBuffer sb) {
         return contentEquals((CharSequence)sb);
     }
 
+    // 比较String和AbstractStringBuilder的内容是否相等
     private boolean nonSyncContentEquals(AbstractStringBuilder sb) {
         char v1[] = value;
         char v2[] = sb.getValue();
@@ -1045,6 +1103,7 @@ public final class String
      *
      * @since  1.5
      */
+    // 比较String和CharSequence的内容是否相等
     public boolean contentEquals(CharSequence cs) {
         // Argument is a StringBuffer, StringBuilder
         if (cs instanceof AbstractStringBuilder) {
@@ -1102,6 +1161,7 @@ public final class String
      *
      * @see  #equals(Object)
      */
+    // 忽略大小写比较String和CharSequence的内容是否相等
     public boolean equalsIgnoreCase(String anotherString) {
         return (this == anotherString) ? true
                 : (anotherString != null)
@@ -1150,6 +1210,10 @@ public final class String
      *          value greater than {@code 0} if this string is
      *          lexicographically greater than the string argument.
      */
+    // 比较两个String，区分大小写
+    // 1.获取长度较短的字符串长度lim
+    // 2.从0开始while循环遍历到lim，依次比较每个字符，
+    // 3.最后比较string与anotherString的长度
     public int compareTo(String anotherString) {
         int len1 = value.length;
         int len2 = anotherString.value.length;
@@ -1181,6 +1245,8 @@ public final class String
      * @see     java.text.Collator#compare(String, String)
      * @since   1.2
      */
+
+    // 字符串比较器
     public static final Comparator<String> CASE_INSENSITIVE_ORDER
                                          = new CaseInsensitiveComparator();
     private static class CaseInsensitiveComparator
@@ -1235,6 +1301,7 @@ public final class String
      * @see     java.text.Collator#compare(String, String)
      * @since   1.2
      */
+    // 比较两个String，不区分大小写
     public int compareToIgnoreCase(String str) {
         return CASE_INSENSITIVE_ORDER.compare(this, str);
     }
@@ -1271,6 +1338,7 @@ public final class String
      *          exactly matches the specified subregion of the string argument;
      *          {@code false} otherwise.
      */
+    // 比较两个String指定的区域，区分大小写
     public boolean regionMatches(int toffset, String other, int ooffset,
             int len) {
         char ta[] = value;
@@ -1341,6 +1409,7 @@ public final class String
      *          or case insensitive depends on the {@code ignoreCase}
      *          argument.
      */
+    // 比较两个String指定的区域，根据ignoreCase参数控制是否忽略大小写
     public boolean regionMatches(boolean ignoreCase, int toffset,
             String other, int ooffset, int len) {
         char ta[] = value;
@@ -1399,6 +1468,7 @@ public final class String
      *          this.substring(toffset).startsWith(prefix)
      *          </pre>
      */
+    // 从下标toffset处开始搜索，判断指定范围的字符串是否以prefix开头
     public boolean startsWith(String prefix, int toffset) {
         char ta[] = value;
         int to = toffset;
@@ -1430,6 +1500,7 @@ public final class String
      *          {@link #equals(Object)} method.
      * @since   1. 0
      */
+    // 从头开始搜索，判断指定范围的字符串是否以prefix开头
     public boolean startsWith(String prefix) {
         return startsWith(prefix, 0);
     }
@@ -1445,6 +1516,7 @@ public final class String
      *          empty string or is equal to this {@code String} object
      *          as determined by the {@link #equals(Object)} method.
      */
+    // 判断字符串是否以suffix结尾
     public boolean endsWith(String suffix) {
         return startsWith(suffix, value.length - suffix.value.length);
     }
@@ -1462,8 +1534,11 @@ public final class String
      *
      * @return  a hash code value for this object.
      */
+    // 返回字符串的hashcode的int值
     public int hashCode() {
         int h = hash;
+        // 第一次调用hashcode时，h==0，进入if逻辑
+        // 后续调用hashcode时，h!=0,直接返回h的值，节省时间，提高效率
         if (h == 0 && value.length > 0) {
             char val[] = value;
 
@@ -1499,6 +1574,7 @@ public final class String
      *          character sequence represented by this object, or
      *          {@code -1} if the character does not occur.
      */
+    // 从串首向后搜索，返回在当前[字符序列]中首次遇到Unicode符号ch时的下标
     public int indexOf(int ch) {
         return indexOf(ch, 0);
     }
@@ -1542,6 +1618,7 @@ public final class String
      *          than or equal to {@code fromIndex}, or {@code -1}
      *          if the character does not occur.
      */
+    // 从fromIndex位置开始向后搜索，返回在当前[字符序列]中首次遇到Unicode符号ch时的下标
     public int indexOf(int ch, int fromIndex) {
         final int max = value.length;
         if (fromIndex < 0) {
@@ -1607,6 +1684,7 @@ public final class String
      *          character sequence represented by this object, or
      *          {@code -1} if the character does not occur.
      */
+    // 从后先前搜索，返回在当前[字符序列]中首次遇到Unicode符号ch时的下标
     public int lastIndexOf(int ch) {
         return lastIndexOf(ch, value.length - 1);
     }
@@ -1694,6 +1772,7 @@ public final class String
      * @return  the index of the first occurrence of the specified substring,
      *          or {@code -1} if there is no such occurrence.
      */
+    // 从后先前搜索，返回在当前[字符序列]中首次遇到Unicode符号ch时的下标
     public int indexOf(String str) {
         return indexOf(str, 0);
     }
@@ -1714,6 +1793,7 @@ public final class String
      *          starting at the specified index,
      *          or {@code -1} if there is no such occurrence.
      */
+    // 从fromIndex开始向后搜索，返回str在原始字符串第一次出现的下标
     public int indexOf(String str, int fromIndex) {
         return indexOf(value, 0, value.length,
                 str.value, 0, str.value.length, fromIndex);
@@ -1730,6 +1810,7 @@ public final class String
      * @param   target       the characters being searched for.
      * @param   fromIndex    the index to begin searching from.
      */
+    // 从fromIndex开始向后搜索，返回str在原始字符串指定范围内第一次出现的下标
     static int indexOf(char[] source, int sourceOffset, int sourceCount,
             String target, int fromIndex) {
         return indexOf(source, sourceOffset, sourceCount,
@@ -1750,6 +1831,7 @@ public final class String
      * @param   targetCount  count of the target string.
      * @param   fromIndex    the index to begin searching from.
      */
+    // 返回子串target在主串source中第一次出现的下标（从主串fromIndex处向后搜索）
     static int indexOf(char[] source, int sourceOffset, int sourceCount,
             char[] target, int targetOffset, int targetCount,
             int fromIndex) {
@@ -1922,6 +2004,7 @@ public final class String
      *             {@code beginIndex} is negative or larger than the
      *             length of this {@code String} object.
      */
+    // 返回字符串从beginIndex开始之后的子串
     public String substring(int beginIndex) {
         if (beginIndex < 0) {
             throw new StringIndexOutOfBoundsException(beginIndex);
@@ -1955,6 +2038,7 @@ public final class String
      *             {@code beginIndex} is larger than
      *             {@code endIndex}.
      */
+    // 返回字符串从beginIndex开始到endIndex的子串
     public String substring(int beginIndex, int endIndex) {
         if (beginIndex < 0) {
             throw new StringIndexOutOfBoundsException(beginIndex);
@@ -1999,6 +2083,7 @@ public final class String
      * @since 1.4
      * @spec JSR-51
      */
+    // 返回字符串从beginIndex开始到endIndex的字符序列
     public CharSequence subSequence(int beginIndex, int endIndex) {
         return this.substring(beginIndex, endIndex);
     }
@@ -2023,6 +2108,7 @@ public final class String
      * @return  a string that represents the concatenation of this object's
      *          characters followed by the string argument's characters.
      */
+    // 连接str生成新的字符串
     public String concat(String str) {
         int otherLen = str.length();
         if (otherLen == 0) {
@@ -2063,6 +2149,7 @@ public final class String
      * @return  a string derived from this string by replacing every
      *          occurrence of {@code oldChar} with {@code newChar}.
      */
+    // 替换所有的oldChar为newChar，返回新的字符串
     public String replace(char oldChar, char newChar) {
         if (oldChar != newChar) {
             int len = value.length;
@@ -2174,6 +2261,7 @@ public final class String
      * @since 1.4
      * @spec JSR-51
      */
+    //将字符串中第一个的target替换为replacement
     public String replaceFirst(String regex, String replacement) {
         return Pattern.compile(regex).matcher(this).replaceFirst(replacement);
     }
@@ -2235,6 +2323,7 @@ public final class String
      * @return  The resulting string
      * @since 1.5
      */
+    //将字符串中所有的target替换为replacement
     public String replace(CharSequence target, CharSequence replacement) {
         return Pattern.compile(target.toString(), Pattern.LITERAL).matcher(
                 this).replaceAll(Matcher.quoteReplacement(replacement.toString()));
@@ -2418,6 +2507,7 @@ public final class String
      * @since 1.4
      * @spec JSR-51
      */
+    // 拆分字符串为字符串数组
     public String[] split(String regex) {
         return split(regex, 0);
     }
@@ -2495,6 +2585,7 @@ public final class String
      * @see    java.util.StringJoiner
      * @since 1.8
      */
+    // 字符序列将elements中元素添加到delimiter，返回新的字符串
     public static String join(CharSequence delimiter,
             Iterable<? extends CharSequence> elements) {
         Objects.requireNonNull(delimiter);
@@ -2666,6 +2757,7 @@ public final class String
      * @return  the {@code String}, converted to lowercase.
      * @see     java.lang.String#toLowerCase(Locale)
      */
+    // 转换为小写字符串
     public String toLowerCase() {
         return toLowerCase(Locale.getDefault());
     }
@@ -2829,6 +2921,8 @@ public final class String
      * @return  the {@code String}, converted to uppercase.
      * @see     java.lang.String#toUpperCase(Locale)
      */
+
+    // 转换为大写字符串
     public String toUpperCase() {
         return toUpperCase(Locale.getDefault());
     }
@@ -2864,6 +2958,7 @@ public final class String
      *          space removed, or this string if it has no leading or
      *          trailing white space.
      */
+    // 去除字符串前后空格，字符串中间的空格无法去除
     public String trim() {
         int len = value.length;
         int st = 0;
@@ -2894,6 +2989,7 @@ public final class String
      *          of this string and whose contents are initialized to contain
      *          the character sequence represented by this string.
      */
+    // 返回字符数组，通过拷贝的方式重新生成一个字符数组返回
     public char[] toCharArray() {
         // Cannot use Arrays.copyOf because of class initialization order issues
         char result[] = new char[value.length];
@@ -3045,6 +3141,7 @@ public final class String
      *          {@code offset+count} is larger than
      *          {@code data.length}.
      */
+    // 返回字符串数组指定范围构造的字符串
     public static String copyValueOf(char data[], int offset, int count) {
         return new String(data, offset, count);
     }
@@ -3056,6 +3153,7 @@ public final class String
      * @return  a {@code String} that contains the characters of the
      *          character array.
      */
+    // 返回字符串数组构造的字符串
     public static String copyValueOf(char data[]) {
         return new String(data);
     }
@@ -3164,5 +3262,7 @@ public final class String
      * @return  a string that has the same contents as this string, but is
      *          guaranteed to be from a pool of unique strings.
      */
+    // 如果常量池中存在当前字符串, 就会直接返回当前字符串.
+    // 如果常量池中没有此字符串, 会将此字符串放入常量池中后, 再返回
     public native String intern();
 }
