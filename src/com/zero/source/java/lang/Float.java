@@ -46,6 +46,7 @@ import sun.misc.DoubleConsts;
  * @author  Joseph D. Darcy
  * @since JDK1.0
  */
+// float的包装类
 public final class Float extends Number implements Comparable<Float> {
     /**
      * A constant holding the positive infinity of type
@@ -118,6 +119,7 @@ public final class Float extends Number implements Comparable<Float> {
      *
      * @since 1.5
      */
+    // 当前类型所占bit[位]数  32bit
     public static final int SIZE = 32;
 
     /**
@@ -125,6 +127,7 @@ public final class Float extends Number implements Comparable<Float> {
      *
      * @since 1.8
      */
+    // 当前类型所占字节数  4bit
     public static final int BYTES = SIZE / Byte.SIZE;
 
     /**
@@ -412,6 +415,7 @@ public final class Float extends Number implements Comparable<Float> {
      * @throws  NumberFormatException  if the string does not contain a
      *          parsable number.
      */
+    // 解析字符串转换为Float对象
     public static Float valueOf(String s) throws NumberFormatException {
         return new Float(parseFloat(s));
     }
@@ -903,6 +907,7 @@ public final class Float extends Number implements Comparable<Float> {
      *          {@code f2}.
      * @since 1.4
      */
+    // 比较float的大小
     public static int compare(float f1, float f2) {
         if (f1 < f2)
             return -1;           // Neither val is NaN, thisVal is smaller
