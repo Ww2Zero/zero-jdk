@@ -49,17 +49,20 @@ import java.lang.annotation.Native;
  * @author  Joseph D. Darcy
  * @since JDK1.0
  */
+// int的包装类
 public final class Integer extends Number implements Comparable<Integer> {
     /**
      * A constant holding the minimum value an {@code int} can
      * have, -2<sup>31</sup>.
      */
+    // 最小值
     @Native public static final int   MIN_VALUE = 0x80000000;
 
     /**
      * A constant holding the maximum value an {@code int} can
      * have, 2<sup>31</sup>-1.
      */
+    //最大值
     @Native public static final int   MAX_VALUE = 0x7fffffff;
 
     /**
@@ -74,6 +77,7 @@ public final class Integer extends Number implements Comparable<Integer> {
     /**
      * All possible chars for representing a number as a String
      */
+    // 进制
     final static char[] digits = {
         '0' , '1' , '2' , '3' , '4' , '5' ,
         '6' , '7' , '8' , '9' , 'a' , 'b' ,
@@ -127,6 +131,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @see     java.lang.Character#MAX_RADIX
      * @see     java.lang.Character#MIN_RADIX
      */
+    // 返回i对应指定进制的字符串
     public static String toString(int i, int radix) {
         if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX)
             radix = 10;
@@ -136,20 +141,21 @@ public final class Integer extends Number implements Comparable<Integer> {
             return toString(i);
         }
 
-        char buf[] = new char[33];
-        boolean negative = (i < 0);
+        char buf[] = new char[33]; // 定义存放转换后的字符的数组
+        boolean negative = (i < 0);  // 获取正负值标志
         int charPos = 32;
 
-        if (!negative) {
+        if (!negative) {         // 转换为负数
             i = -i;
         }
 
+        // 辗转相除从后向前转换为对应进制
         while (i <= -radix) {
             buf[charPos--] = digits[-(i % radix)];
             i = i / radix;
         }
         buf[charPos] = digits[-i];
-
+        // 判断是否需要在前面添加负号
         if (negative) {
             buf[--charPos] = '-';
         }
@@ -229,6 +235,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @see #toUnsignedString(int, int)
      * @since   JDK1.0.2
      */
+    // 转换为16进制
     public static String toHexString(int i) {
         return toUnsignedString0(i, 4);
     }
@@ -267,6 +274,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @see #toUnsignedString(int, int)
      * @since   JDK1.0.2
      */
+    // 转换为8进制
     public static String toOctalString(int i) {
         return toUnsignedString0(i, 3);
     }
@@ -299,6 +307,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @see #toUnsignedString(int, int)
      * @since   JDK1.0.2
      */
+    // 转换为二进制
     public static String toBinaryString(int i) {
         return toUnsignedString0(i, 1);
     }
@@ -394,6 +403,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @param   i   an integer to be converted.
      * @return  a string representation of the argument in base&nbsp;10.
      */
+    // 转换为字符串
     public static String toString(int i) {
         if (i == Integer.MIN_VALUE)
             return "-2147483648";
@@ -417,6 +427,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @see     #toUnsignedString(int, int)
      * @since 1.8
      */
+    // 转换为无符号的数字对应的字符串
     public static String toUnsignedString(int i) {
         return Long.toString(toUnsignedLong(i));
     }
@@ -529,6 +540,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @exception  NumberFormatException if the {@code String}
      *             does not contain a parsable {@code int}.
      */
+    // 以指定进制转换字符串为int
     public static int parseInt(String s, int radix)
                 throws NumberFormatException
     {
@@ -776,7 +788,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * may be set and saved in the private system properties in the
      * sun.misc.VM class.
      */
-
+    // Integer的缓存
     private static class IntegerCache {
         static final int low = -128;
         static final int high;
@@ -1246,6 +1258,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      *         unsigned values
      * @since 1.8
      */
+    // 比较无符号数字
     public static int compareUnsigned(int x, int y) {
         return compare(x + MIN_VALUE, y + MIN_VALUE);
     }
@@ -1289,6 +1302,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @see #remainderUnsigned
      * @since 1.8
      */
+    // 数字转换为无符号之后进行除法
     public static int divideUnsigned(int dividend, int divisor) {
         // In lieu of tricky code, for now just use long arithmetic.
         return (int)(toUnsignedLong(dividend) / toUnsignedLong(divisor));
@@ -1419,6 +1433,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      *     to zero.
      * @since 1.5
      */
+    // 返回二进制位中末尾连续的0的个数（把int值i表示为二进制形式）
     public static int numberOfTrailingZeros(int i) {
         // HD, Figure 5-14
         int y;
@@ -1441,6 +1456,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      *     representation of the specified {@code int} value.
      * @since 1.5
      */
+    // 返回二进制位中值为1的bit位的数量（把int值i表示为二进制形式）
     public static int bitCount(int i) {
         // HD, Figure 5-2
         i = i - ((i >>> 1) & 0x55555555);
@@ -1471,6 +1487,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      *     specified number of bits.
      * @since 1.5
      */
+    // 将i中的bit循环左移distance位
     public static int rotateLeft(int i, int distance) {
         return (i << distance) | (i >>> -distance);
     }
@@ -1495,6 +1512,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      *     specified number of bits.
      * @since 1.5
      */
+    // 将i中的bit循环右移distance位
     public static int rotateRight(int i, int distance) {
         return (i >>> distance) | (i << -distance);
     }
@@ -1509,6 +1527,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      *     specified {@code int} value.
      * @since 1.5
      */
+    // 以bit为单位逆置bit顺序
     public static int reverse(int i) {
         // HD, Figure 7-1
         i = (i & 0x55555555) << 1 | (i >>> 1) & 0x55555555;
@@ -1528,6 +1547,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @return the signum function of the specified {@code int} value.
      * @since 1.5
      */
+    // 判断i的正负。遇到负数返回-1，正数返回1，0返回0。
     public static int signum(int i) {
         // HD, Section 2-7
         return (i >> 31) | (-i >>> 31);
@@ -1542,6 +1562,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      *     {@code int} value.
      * @since 1.5
      */
+    // 以字节为单位逆置字节顺序
     public static int reverseBytes(int i) {
         return ((i >>> 24)           ) |
                ((i >>   8) &   0xFF00) |
