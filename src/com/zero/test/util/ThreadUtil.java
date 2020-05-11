@@ -28,7 +28,16 @@ public final class ThreadUtil {
         printLine(0);
     }
 
-    public static void printThreadInfo(Thread t) {
+    public static void printString(String str) {
+        System.out.println("====" + str);
+    }
+
+    public static void printLine(String str) {
+        printLine(str);
+        printLine(0);
+    }
+
+    public static void printThreadShortInfo(Thread t) {
         printLine(1);
         System.out.println("t = " + t);
         System.out.println("t.getId() = " + t.getId());
@@ -40,12 +49,20 @@ public final class ThreadUtil {
         System.out.println("t.isInterrupted() = " + t.isInterrupted());
         System.out.println("t.isDaemon() = " + t.isDaemon());
         System.out.println("t.getContextClassLoader() = " + t.getContextClassLoader());
-        printThreadGroupInfo(t.getThreadGroup());
+    }
+
+    public static void printStackTraceAllInfo(Thread t) {
         System.out.println("t.getStackTrace() = " + t.getStackTrace().length);
         for (StackTraceElement stackTraceElement : t.getStackTrace()) {
             printLine(2);
             printStackTraceInfo(stackTraceElement);
         }
+    }
+
+    public static void printThreadInfo(Thread t) {
+        printThreadShortInfo(t);
+        printThreadGroupInfo(t.getThreadGroup());
+        printStackTraceAllInfo(t);
         System.out.println("t.getUncaughtExceptionHandler() = " + t.getUncaughtExceptionHandler());
     }
 
