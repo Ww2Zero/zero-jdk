@@ -41,11 +41,11 @@ public final class ThreadUtil {
     }
 
     public static void printString(String str) {
-        System.out.println("====" + str);
+        System.out.println("====>" + str);
     }
 
     public static void printLine(String str) {
-        printLine(str);
+        printString(str);
         printLine(0);
     }
 
