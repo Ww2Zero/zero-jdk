@@ -1,5 +1,6 @@
 package com.zero.test.util;
 
+
 public final class ThreadUtil {
 
     public static final String LINE = "=+++++++++++++++++++++++++++++++++++++++++++++= ";
@@ -12,6 +13,17 @@ public final class ThreadUtil {
             Thread.sleep(millis);
         } catch (InterruptedException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void waitObj(long millis){
+        Thread lock = Thread.currentThread();
+        synchronized (lock){
+            try {
+                lock.wait(millis);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
