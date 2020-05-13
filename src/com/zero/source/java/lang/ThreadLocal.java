@@ -25,7 +25,9 @@
 
 package java.lang;
 import java.lang.ref.*;
+import java.util.Arrays;
 import java.util.Objects;
+import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -71,6 +73,7 @@ import java.util.function.Supplier;
  * @author  Josh Bloch and Doug Lea
  * @since   1.2
  */
+
 public class ThreadLocal<T> {
     /**
      * ThreadLocals rely on per-thread linear-probe hash maps attached
@@ -313,6 +316,22 @@ public class ThreadLocal<T> {
                 super(k);
                 value = v;
             }
+
+            @Override
+            public String toString() {
+                return new StringJoiner(", ", Entry.class.getSimpleName() + "[", "]")
+                        .add("value=" + value)
+                        .toString();
+            }
+        }
+
+        @Override
+        public String toString() {
+            return new StringJoiner(", ", ThreadLocalMap.class.getSimpleName() + "[", "]")
+                    .add("table=" + Arrays.toString(table))
+                    .add("size=" + size)
+                    .add("threshold=" + threshold)
+                    .toString();
         }
 
         /**
