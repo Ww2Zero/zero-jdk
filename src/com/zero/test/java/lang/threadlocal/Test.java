@@ -5,10 +5,20 @@ import com.zero.test.util.ThreadUtil;
 public class Test {
     public static void main(String[] args) {
 //        test01();
-        test02();
-        test03();
+//        test02();
+//        test03();
+        test04();
     }
 
+    private static void test04() {
+        ThreadLocal<Integer> local1 = new ThreadLocal<>();
+        ThreadLocal<Integer> local2 = new ThreadLocal<>();
+        local1.set(100);
+        System.out.println("local.get() = " + local1.get());
+        System.out.println("local.get() = " + local2.get());
+        System.gc();
+        System.out.println("local.get() = " + local1.get());
+    }
     private static void test03() {
         ThreadLocal<Integer> local = new ThreadLocal<>();
 
