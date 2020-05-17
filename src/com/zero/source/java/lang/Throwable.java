@@ -111,6 +111,27 @@ import  java.util.*;
  * @jls 11.2 Compile-Time Checking of Exceptions
  * @since JDK1.0
  */
+/**
+ * 异常体系的祖先
+ *
+ * 异常体系：
+ *                           Throwable
+ *                               |
+ *                    +----------+-----------+
+ *                    |                      |
+ *                Exception                Error
+ *                    |                      |
+ *        +-----------+-----------+         ...
+ *        |                       |
+ * RuntimeException              ...
+ *        |
+ *       ...
+ *
+ * Throwable       : 所有异常的祖先类
+ * RuntimeException: 运行时异常，或称非检查异常；这类异常意味着程序出现了难以恢复的错误，允许不进行捕获
+ * Exception       : 除运行时异常之外的异常，或称检查异常；这类异常意味着程序出现错误时可能是允许被恢复的，需要在编译期就捕获，否则无法编译
+ * Error           : 非常严重的异常，该类异常往往意味着JVM内部出现了问题
+ */
 public class Throwable implements Serializable {
     /** use serialVersionUID from JDK 1.0.2 for interoperability */
     private static final long serialVersionUID = -3042686055658047285L;
@@ -127,6 +148,7 @@ public class Throwable implements Serializable {
      *
      * @serial
      */
+    //  详细信息
     private String detailMessage;
 
 
@@ -156,6 +178,7 @@ public class Throwable implements Serializable {
     /**
      * A shared value for an empty stack.
      */
+    // 共享的空的栈
     private static final StackTraceElement[] UNASSIGNED_STACK = new StackTraceElement[0];
 
     /*
@@ -194,6 +217,7 @@ public class Throwable implements Serializable {
      * @serial
      * @since 1.4
      */
+    // 异常原因
     private Throwable cause = this;
 
     /**
@@ -224,6 +248,7 @@ public class Throwable implements Serializable {
      * @serial
      * @since 1.7
      */
+    // 抑制异常
     private List<Throwable> suppressedExceptions = SUPPRESSED_SENTINEL;
 
     /** Message for trying to suppress a null exception. */
@@ -373,6 +398,7 @@ public class Throwable implements Serializable {
      * @return  the detail message string of this {@code Throwable} instance
      *          (which may be {@code null}).
      */
+    // 获取详细信息
     public String getMessage() {
         return detailMessage;
     }
@@ -387,6 +413,7 @@ public class Throwable implements Serializable {
      * @return  The localized description of this throwable.
      * @since   JDK1.1
      */
+    // 获取本地的详细信息
     public String getLocalizedMessage() {
         return getMessage();
     }
@@ -411,6 +438,7 @@ public class Throwable implements Serializable {
      *          cause is nonexistent or unknown.
      * @since 1.4
      */
+    // 获取原因
     public synchronized Throwable getCause() {
         return (cause==this ? null : cause);
     }
@@ -451,6 +479,7 @@ public class Throwable implements Serializable {
      *         been called on this throwable.
      * @since  1.4
      */
+    // 初始化原因
     public synchronized Throwable initCause(Throwable cause) {
         if (this.cause != this)
             throw new IllegalStateException("Can't overwrite cause with " +
@@ -630,6 +659,7 @@ public class Throwable implements Serializable {
      *          ... 2 more
      * </pre>
      */
+    // 标准异常输出堆栈信息
     public void printStackTrace() {
         printStackTrace(System.err);
     }
@@ -777,6 +807,7 @@ public class Throwable implements Serializable {
      * @return  a reference to this {@code Throwable} instance.
      * @see     java.lang.Throwable#printStackTrace()
      */
+    // 填充调用的堆栈
     public synchronized Throwable fillInStackTrace() {
         if (stackTrace != null ||
             backtrace != null /* Out of protocol state */ ) {
@@ -859,6 +890,7 @@ public class Throwable implements Serializable {
      *
      * @since  1.4
      */
+    // 设置堆栈
     public void setStackTrace(StackTraceElement[] stackTrace) {
         // Validate argument
         StackTraceElement[] defensiveCopy = stackTrace.clone();
@@ -881,6 +913,7 @@ public class Throwable implements Serializable {
      *
      * package-protection for use by SharedSecrets.
      */
+    // 获取堆栈的深度
     native int getStackTraceDepth();
 
     /**
@@ -892,6 +925,7 @@ public class Throwable implements Serializable {
      * @throws IndexOutOfBoundsException if {@code index < 0 ||
      *         index >= getStackTraceDepth() }
      */
+    // 返回指定的堆栈
     native StackTraceElement getStackTraceElement(int index);
 
     /**
@@ -1037,6 +1071,11 @@ public class Throwable implements Serializable {
      *         throwable; a throwable cannot suppress itself.
      * @throws NullPointerException if {@code exception} is {@code null}
      * @since 1.7
+     */
+    /**
+     * 为当前异常添加一个抑制(次要)异常
+     *
+     * 注：这种机制弥补了"Cause"的缺陷，当存在多个待抛异常时，可以用此种方式来区分主次
      */
     public final synchronized void addSuppressed(Throwable exception) {
         if (exception == this)
