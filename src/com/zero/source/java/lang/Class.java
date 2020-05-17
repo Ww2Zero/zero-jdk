@@ -116,14 +116,20 @@ import sun.reflect.misc.ReflectUtil;
  * @see     java.lang.ClassLoader#defineClass(byte[], int, int)
  * @since   JDK1.0
  */
+
+// 类 反射元素
 public final class Class<T> implements java.io.Serializable,
                               GenericDeclaration,
                               Type,
                               AnnotatedElement {
+    // 注解
     private static final int ANNOTATION= 0x00002000;
+    // 枚举
     private static final int ENUM      = 0x00004000;
+    // 合成的
     private static final int SYNTHETIC = 0x00001000;
 
+    // 注册本地方法
     private static native void registerNatives();
     static {
         registerNatives();
@@ -134,6 +140,7 @@ public final class Class<T> implements java.io.Serializable,
      * This constructor is not used and prevents the default constructor being
      * generated.
      */
+    // 私有的构造方法，禁止通过new的方式初始化
     private Class(ClassLoader loader) {
         // Initialize final field for classLoader.  The initialization value of non-null
         // prevents future JIT optimizations from assuming this final field is null.
@@ -182,7 +189,9 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since 1.8
      */
+    // 生成描述类的字符串
     public String toGenericString() {
+        // 判断是否为原始数据类型
         if (isPrimitive()) {
             return toString();
         } else {
@@ -194,13 +203,15 @@ public final class Class<T> implements java.io.Serializable,
                 sb.append(Modifier.toString(modifiers));
                 sb.append(' ');
             }
-
+            // 判断是否注解
             if (isAnnotation()) {
                 sb.append('@');
             }
+            // 判断是否为接口
             if (isInterface()) { // Note: all annotation types are interfaces
                 sb.append("interface");
             } else {
+                // 判断是否为枚举
                 if (isEnum())
                     sb.append("enum");
                 else
@@ -257,11 +268,13 @@ public final class Class<T> implements java.io.Serializable,
      *            by this method fails
      * @exception ClassNotFoundException if the class cannot be located
      */
+    // 根据类的全名加载类对象，而且加载类之后对类的静态元素进行初始化
     @CallerSensitive
     public static Class<?> forName(String className)
                 throws ClassNotFoundException {
         Class<?> caller = Reflection.getCallerClass();
-        return forName0(className, true, ClassLoader.getClassLoader(caller), caller);
+        ClassLoader classLoader = ClassLoader.getClassLoader(caller);
+        return forName0(className, true, classLoader, caller);
     }
 
 
@@ -326,6 +339,7 @@ public final class Class<T> implements java.io.Serializable,
      * @see       java.lang.ClassLoader
      * @since     1.2
      */
+    // 根据类的全名和指定的类加载器加载类对象，initialize参数指示是否在加载类之后对类中的静态元素进行初始化
     @CallerSensitive
     public static Class<?> forName(String name, boolean initialize,
                                    ClassLoader loader)
@@ -347,7 +361,7 @@ public final class Class<T> implements java.io.Serializable,
         }
         return forName0(name, initialize, loader, caller);
     }
-
+    // 安全检查之后调用系统加载
     /** Called after security check for system loader access checks have been made. */
     private static native Class<?> forName0(String name, boolean initialize,
                                             ClassLoader loader,
@@ -389,6 +403,7 @@ public final class Class<T> implements java.io.Serializable,
      *          s.checkPackageAccess()} denies access to the package
      *          of this class.
      */
+    // 创建当前类的对象
     @CallerSensitive
     public T newInstance()
         throws InstantiationException, IllegalAccessException
@@ -480,6 +495,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since JDK1.1
      */
+    // 判断对象是否接口对象
     public native boolean isInstance(Object obj);
 
 
@@ -507,6 +523,10 @@ public final class Class<T> implements java.io.Serializable,
      *            null.
      * @since JDK1.1
      */
+    /**
+     * X.class.isAssignableFrom(cls) ==> 判断cls类型的对象是否为X类型的实例
+     * 即判断X与cls所属的类/接口是否相同，或者X是cls的父类/父接口
+     */
     public native boolean isAssignableFrom(Class<?> cls);
 
 
@@ -517,6 +537,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return  {@code true} if this object represents an interface;
      *          {@code false} otherwise.
      */
+    // 返回指定的类对象对象是否是接口类型
     public native boolean isInterface();
 
 
@@ -527,6 +548,7 @@ public final class Class<T> implements java.io.Serializable,
      *          {@code false} otherwise.
      * @since   JDK1.1
      */
+    // 返回指定的类对象是否是数组
     public native boolean isArray();
 
 
@@ -558,6 +580,7 @@ public final class Class<T> implements java.io.Serializable,
      * @see     java.lang.Void#TYPE
      * @since JDK1.1
      */
+    //返回类对象是否为原始类型
     public native boolean isPrimitive();
 
     /**
@@ -569,6 +592,7 @@ public final class Class<T> implements java.io.Serializable,
      *      type; {@code false} otherwise
      * @since 1.5
      */
+    // 判断是否为注解
     public boolean isAnnotation() {
         return (getModifiers() & ANNOTATION) != 0;
     }
@@ -581,6 +605,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 13.1 The Form of a Binary
      * @since 1.5
      */
+    // 判断是否为组合
     public boolean isSynthetic() {
         return (getModifiers() & SYNTHETIC) != 0;
     }
@@ -636,6 +661,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return  the name of the class or interface
      *          represented by this object.
      */
+    // 获取的类的名字
     public String getName() {
         String name = this.name;
         if (name == null)
@@ -673,6 +699,7 @@ public final class Class<T> implements java.io.Serializable,
      * @see SecurityManager#checkPermission
      * @see java.lang.RuntimePermission
      */
+    // 获取类的类加载器
     @CallerSensitive
     public ClassLoader getClassLoader() {
         ClassLoader cl = getClassLoader0();
@@ -687,7 +714,7 @@ public final class Class<T> implements java.io.Serializable,
 
     // Package-private to allow ClassLoader access
     ClassLoader getClassLoader0() { return classLoader; }
-
+    // 被JVM初始化，而不是在构造方法中初始化
     // Initialized in JVM not by private constructor
     // This field is filtered from reflection access, i.e. getDeclaredField
     // will throw NoSuchFieldException
@@ -708,6 +735,7 @@ public final class Class<T> implements java.io.Serializable,
      *     <cite>The Java&trade; Virtual Machine Specification</cite>
      * @since 1.5
      */
+    // 返回generic type中的type variable，如：Map<K, V>中的K和V
     @SuppressWarnings("unchecked")
     public TypeVariable<Class<T>>[] getTypeParameters() {
         ClassRepository info = getGenericInfo();
@@ -761,6 +789,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return the superclass of the class represented by this object
      * @since 1.5
      */
+    // 获取当前类的父类（可识别泛型类型和非泛型类型）
     public Type getGenericSuperclass() {
         ClassRepository info = getGenericInfo();
         if (info == null) {
@@ -792,6 +821,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return the package of the class, or null if no package
      *         information is available from the archive or codebase.
      */
+    // 获取包信息
     public Package getPackage() {
         return Package.getPackage(this);
     }
@@ -841,6 +871,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @return an array of interfaces implemented by this class.
      */
+    // 获取接口数组
     public Class<?>[] getInterfaces() {
         ReflectionData<T> rd = reflectionData();
         if (rd == null) {
@@ -908,6 +939,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return an array of interfaces implemented by this class
      * @since 1.5
      */
+    // 获取当前类的父接口（可识别泛型类型和非泛型类型）
     public Type[] getGenericInterfaces() {
         ClassRepository info = getGenericInfo();
         return (info == null) ?  getInterfaces() : info.getSuperInterfaces();
@@ -924,6 +956,7 @@ public final class Class<T> implements java.io.Serializable,
      * @see     java.lang.reflect.Array
      * @since JDK1.1
      */
+    // 获取数组的组件类型，如int[]返回int，int[][]返回int[]。如果不是数组，则返回空
     public native Class<?> getComponentType();
 
 
@@ -954,6 +987,7 @@ public final class Class<T> implements java.io.Serializable,
      * @see     java.lang.reflect.Modifier
      * @since JDK1.1
      */
+    // 获取类的修饰符信息，参见java.lang.reflect.Modifier
     public native int getModifiers();
 
 
@@ -965,12 +999,14 @@ public final class Class<T> implements java.io.Serializable,
      *          a primitive type or void.
      * @since   JDK1.1
      */
+    // 获取类的签名
     public native Object[] getSigners();
 
 
     /**
      * Set the signers of this class.
      */
+    // 设置类的签名
     native void setSigners(Object[] signers);
 
 
@@ -1010,6 +1046,7 @@ public final class Class<T> implements java.io.Serializable,
      *         </ul>
      * @since 1.5
      */
+    // 返回方法内部类或定义在方法内部的匿名类所处的外部方法。如果该类定义在方法外部，则调用此方法时返回null
     @CallerSensitive
     public Method getEnclosingMethod() throws SecurityException {
         EnclosingMethodInfo enclosingInfo = getEnclosingMethodInfo();
@@ -1302,6 +1339,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return the simple name of the underlying class
      * @since 1.5
      */
+    // 获取简单的名称
     public String getSimpleName() {
         if (isArray())
             return getComponentType().getSimpleName()+"[]";
@@ -1379,6 +1417,7 @@ public final class Class<T> implements java.io.Serializable,
      * {@code null} otherwise.
      * @since 1.5
      */
+    // 返回权威的名称
     public String getCanonicalName() {
         if (isArray()) {
             String canonicalName = getComponentType().getCanonicalName();
@@ -1407,6 +1446,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return {@code true} if and only if this class is an anonymous class.
      * @since 1.5
      */
+    // 是否匿名的类
     public boolean isAnonymousClass() {
         return "".equals(getSimpleName());
     }
@@ -1418,6 +1458,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return {@code true} if and only if this class is a local class.
      * @since 1.5
      */
+    // 是否本地类
     public boolean isLocalClass() {
         return isLocalOrAnonymousClass() && !isAnonymousClass();
     }
@@ -1429,6 +1470,7 @@ public final class Class<T> implements java.io.Serializable,
      * @return {@code true} if and only if this class is a member class.
      * @since 1.5
      */
+    // 是否成员类
     public boolean isMemberClass() {
         return getSimpleBinaryName() != null && !isLocalOrAnonymousClass();
     }
@@ -1439,6 +1481,7 @@ public final class Class<T> implements java.io.Serializable,
      * Returns {@code null} if the underlying class is a top level
      * class.
      */
+    // 获取 简单的二进制名称
     private String getSimpleBinaryName() {
         Class<?> enclosingClass = getEnclosingClass();
         if (enclosingClass == null) // top level class
@@ -1485,6 +1528,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since JDK1.1
      */
+    // 获取当前类包含的内部类/接口，仅包含public修饰的内部接口、内部抽象类、内部实例类，会继承父类内容，但不会继承父接口的内容
     @CallerSensitive
     public Class<?>[] getClasses() {
         checkMemberAccess(Member.PUBLIC, Reflection.getCallerClass(), false);
@@ -1551,6 +1595,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 8.2 Class Members
      * @jls 8.3 Field Declarations
      */
+    // 获取字段数组
     @CallerSensitive
     public Field[] getFields() throws SecurityException {
         checkMemberAccess(Member.PUBLIC, Reflection.getCallerClass(), true);
@@ -1609,6 +1654,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 8.4 Method Declarations
      * @since JDK1.1
      */
+    // 获取方法数组
     @CallerSensitive
     public Method[] getMethods() throws SecurityException {
         checkMemberAccess(Member.PUBLIC, Reflection.getCallerClass(), true);
@@ -1645,6 +1691,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since JDK1.1
      */
+    // 获取构造函数数组
     @CallerSensitive
     public Constructor<?>[] getConstructors() throws SecurityException {
         checkMemberAccess(Member.PUBLIC, Reflection.getCallerClass(), true);
@@ -1694,6 +1741,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 8.2 Class Members
      * @jls 8.3 Field Declarations
      */
+    // 获取指定的字段
     @CallerSensitive
     public Field getField(String name)
         throws NoSuchFieldException, SecurityException {
@@ -1777,6 +1825,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 8.4 Method Declarations
      * @since JDK1.1
      */
+    // 获取指定的方法
     @CallerSensitive
     public Method getMethod(String name, Class<?>... parameterTypes)
         throws NoSuchMethodException, SecurityException {
@@ -1818,6 +1867,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since JDK1.1
      */
+    // 获取指定的构造方法
     @CallerSensitive
     public Constructor<T> getConstructor(Class<?>... parameterTypes)
         throws NoSuchMethodException, SecurityException {
@@ -1861,6 +1911,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since JDK1.1
      */
+    // 获取当前类包含的内部类/接口，包含所有权限修饰符修饰的内部接口、内部抽象类、内部实例类，不会继承父类和父接口的内容
     @CallerSensitive
     public Class<?>[] getDeclaredClasses() throws SecurityException {
         checkMemberAccess(Member.DECLARED, Reflection.getCallerClass(), false);
@@ -1910,6 +1961,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 8.2 Class Members
      * @jls 8.3 Field Declarations
      */
+    // 获取当前类包含的字段，包含所有权限修饰符修饰的字段，不会继承父类和父接口的内容
     @CallerSensitive
     public Field[] getDeclaredFields() throws SecurityException {
         checkMemberAccess(Member.DECLARED, Reflection.getCallerClass(), true);
@@ -1969,6 +2021,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 8.4 Method Declarations
      * @since JDK1.1
      */
+    // 获取当前类包含的方法，包含所有权限修饰符修饰的方法，不会继承父类和父接口的内容
     @CallerSensitive
     public Method[] getDeclaredMethods() throws SecurityException {
         checkMemberAccess(Member.DECLARED, Reflection.getCallerClass(), true);
@@ -2014,6 +2067,7 @@ public final class Class<T> implements java.io.Serializable,
      *
      * @since JDK1.1
      */
+    // 获取当前类包含的构造方法，包含所有权限修饰符修饰的构造方法，不会继承父类和父接口的内容
     @CallerSensitive
     public Constructor<?>[] getDeclaredConstructors() throws SecurityException {
         checkMemberAccess(Member.DECLARED, Reflection.getCallerClass(), true);
@@ -2061,6 +2115,7 @@ public final class Class<T> implements java.io.Serializable,
      * @jls 8.2 Class Members
      * @jls 8.3 Field Declarations
      */
+
     @CallerSensitive
     public Field getDeclaredField(String name)
         throws NoSuchFieldException, SecurityException {
@@ -2257,6 +2312,14 @@ public final class Class<T> implements java.io.Serializable,
      *              resource with this name is found
      * @since  JDK1.1
      */
+    /**
+     * 查找指定名称的资源，并返回其URL。
+     * 如果当前类位于命名模块，则在模块路径(根目录)下查找；否则，在类路径(根目录)上查找。
+     *
+     * resName路径需以"/"分割。
+     * 如果resName以'/'开头，则会在模块路径/类路径的根目录下查找；
+     * 如果resName不以'/'开头，则会在(当前类所在目录+"/"+resName)下查找
+     */
     public java.net.URL getResource(String name) {
         name = resolveName(name);
         ClassLoader cl = getClassLoader0();
@@ -2333,6 +2396,7 @@ public final class Class<T> implements java.io.Serializable,
      * <p> Default policy: allow all clients access with normal Java access
      * control.
      */
+    // 检查访问权限
     private void checkMemberAccess(int which, Class<?> caller, boolean checkProxyInterfaces) {
         final SecurityManager s = System.getSecurityManager();
         if (s != null) {
@@ -2460,14 +2524,15 @@ public final class Class<T> implements java.io.Serializable,
     // Caches for certain reflective results
     private static boolean useCaches = true;
 
+    // 反射数据
     // reflection data that might get invalidated when JVM TI RedefineClasses() is called
     private static class ReflectionData<T> {
-        volatile Field[] declaredFields;
-        volatile Field[] publicFields;
-        volatile Method[] declaredMethods;
-        volatile Method[] publicMethods;
-        volatile Constructor<T>[] declaredConstructors;
-        volatile Constructor<T>[] publicConstructors;
+        volatile Field[] declaredFields;   // 所有的字段数组（public修饰，private修饰，protected修饰）
+        volatile Field[] publicFields;  // public修饰的字段数组
+        volatile Method[] declaredMethods;  // 所有的方法数组
+        volatile Method[] publicMethods;  // public修饰的方法数组
+        volatile Constructor<T>[] declaredConstructors; //所有的构造函数
+        volatile Constructor<T>[] publicConstructors;  // public修复的构造函数
         // Intermediate results for getFields and getMethods
         volatile Field[] declaredPublicFields;
         volatile Method[] declaredPublicMethods;
