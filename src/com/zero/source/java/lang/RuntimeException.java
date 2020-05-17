@@ -40,6 +40,10 @@ package java.lang;
  * @jls 11.2 Compile-Time Checking of Exceptions
  * @since   JDK1.0
  */
+
+/**
+ * 运用时异常，不需要检查的异常，不需要构造函数中进行声明
+ */
 public class RuntimeException extends Exception {
     static final long serialVersionUID = -7034897190745766939L;
 
