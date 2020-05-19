@@ -1,4 +1,4 @@
-package com.zero.test.java.lang.clazz;
+package com.zero.test.java.lang.clazz.模板01;
 
 public interface 接口 {
     public          interface 接口_内部接口_public { }

@@ -1,11 +1,18 @@
 package com.zero.test.java.lang.clazz;
 
+import com.zero.test.java.lang.clazz.模板01.A;
+import com.zero.test.java.lang.clazz.模板01.实例类;
+import com.zero.test.java.lang.clazz.模板02.子类;
+import com.zero.test.java.lang.clazz.模板03.Child;
+import com.zero.test.java.lang.clazz.模板03.Parent;
+import com.zero.test.java.lang.clazz.模板03.注解_不可继承_public;
+import com.zero.test.java.lang.clazz.模板03.注解_可继承_public;
+import com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承;
+import com.zero.test.java.lang.clazz.模板04.可重复注解_可继承;
 import com.zero.test.util.ClassUtil;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.*;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -34,8 +41,315 @@ public class Test {
 //        test12();
 //        test13();
 //        test14();
-        test15();
+//        test15();
 
+//        test16();
+
+//        test17();
+
+//        test18();
+//        test19();
+
+
+//        test20();
+//        test21();
+
+
+//        test22();
+
+//        test23();
+//        test24();
+
+        test25();
+
+    }
+
+    /**
+     * ====getAnnotatedInterfaces（要求注解支持ElementType.TYPE_USE）====
+     *
+     * ====获取Annotation====
+     * @com.zero.test.java.lang.clazz.模板05.注解03()
+     * @com.zero.test.java.lang.clazz.模板05.注解04()
+     *
+     * ====获取Type====
+     * interface com.zero.test.java.lang.clazz.模板05.Interface01
+     * interface com.zero.test.java.lang.clazz.模板05.Interface02
+     */
+    private static void test25() {
+        System.out.println("====getAnnotatedInterfaces（要求注解支持ElementType.TYPE_USE）====");
+
+        // 这里的ats代表“@注解01 Interface01, @注解02 Interface02”这个整体
+        AnnotatedType[] ats = com.zero.test.java.lang.clazz.模板05.Child.class.getAnnotatedInterfaces();
+
+        System.out.println("\n====获取Annotation====");
+        for(AnnotatedType at : ats){
+            Annotation[] annotations =at.getAnnotations();
+            for (Annotation a : annotations){
+                System.out.println(a);
+            }
+        }
+
+        System.out.println("\n====获取Type====");
+        for(AnnotatedType at : ats){
+            Type type = at.getType();
+            System.out.println(type);
+        }
+    }
+
+    /**
+     * ====getAnnotatedSuperclass（要求注解支持ElementType.TYPE_USE）====
+     *
+     * ====获取Annotation====
+     * @com.zero.test.java.lang.clazz.模板05.注解01()
+     * @com.zero.test.java.lang.clazz.模板05.注解02()
+     *
+     * ====获取Type====
+     * class com.zero.test.java.lang.clazz.模板05.Parent
+     * false
+     */
+    private static void test24() {
+        System.out.println("====getAnnotatedSuperclass（要求注解支持ElementType.TYPE_USE）====");
+
+        // 这里的at代表“@注解01 @注解02 Parent”这个整体，而不单是Parent
+        AnnotatedType at = com.zero.test.java.lang.clazz.模板05.Child.class.getAnnotatedSuperclass();
+
+        System.out.println("\n====获取Annotation====");
+        Annotation[] annotations =at.getAnnotations();
+        for (Annotation a : annotations){
+            System.out.println(a);
+        }
+
+        System.out.println("\n====获取Type====");
+        Type type = at.getType();
+        System.out.println(type);
+        System.out.println(type== Parent.class);
+    }
+
+    /**
+     * ====getDeclaredAnnotationsByType====
+     *
+     * ====父类中指定类型的注解（不包括继承而来的注解）====
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=父类-1)
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=父类-2)
+     *
+     * ====子类中指定类型的注解（不包括继承而来的注解）====
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=子类-1)
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=子类-2)
+     *
+     */
+    private static void test23() {
+        System.out.println("====getDeclaredAnnotationsByType====");
+
+        System.out.println("\n====父类中指定类型的注解（不包括继承而来的注解）====");
+        Annotation[] as1 = com.zero.test.java.lang.clazz.模板04.Parent.class.getDeclaredAnnotationsByType(可重复注解_不可继承.class);
+        for (Annotation a : as1){
+            System.out.println(a);
+        }
+
+
+        System.out.println("\n====子类中指定类型的注解（不包括继承而来的注解）====");
+        Annotation[] as2 = com.zero.test.java.lang.clazz.模板04.Child.class.getDeclaredAnnotationsByType(可重复注解_不可继承.class);
+        for (Annotation a : as2){
+            System.out.println(a);
+        }
+
+        System.out.println();
+
+        Annotation[] as3 = com.zero.test.java.lang.clazz.模板04.Child.class.getDeclaredAnnotationsByType(可重复注解_可继承.class);
+        for (Annotation a : as3){
+            System.out.println(a);  // 无输出，因为没有获取到相应的注解
+        }
+    }
+
+    /**
+     * ====getAnnotationsByType====  // 获取指定的注解的数组
+     *
+     * ====父类中指定类型的注解（包括继承而来的注解）====
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=父类-1)
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=父类-2)
+     *
+     * ====子类中指定类型的注解（包括继承而来的注解）====
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=子类-1)
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_不可继承(str=子类-2)
+     *
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_可继承(str=父类-3) // 继承父类
+     * @com.zero.test.java.lang.clazz.模板04.可重复注解_可继承(str=父类-4) // 继承父类
+     */
+    private static void test22() {
+        System.out.println("====getAnnotationsByType====");
+
+        System.out.println("\n====父类中指定类型的注解（包括继承而来的注解）====");
+        Annotation[] as1 = com.zero.test.java.lang.clazz.模板04.Parent.class.getAnnotationsByType(可重复注解_不可继承.class);
+        for (Annotation a : as1){
+            System.out.println(a);
+        }
+
+        System.out.println("\n====子类中指定类型的注解（包括继承而来的注解）====");
+        Annotation[] as2 = com.zero.test.java.lang.clazz.模板04.Child.class.getAnnotationsByType(可重复注解_不可继承.class);
+        for (Annotation a : as2){
+            System.out.println(a);
+        }
+
+        System.out.println();
+
+        Annotation[] as3 = com.zero.test.java.lang.clazz.模板04.Child.class.getAnnotationsByType(可重复注解_可继承.class);
+        for (Annotation a : as3){
+            System.out.println(a);
+        }
+    }
+
+    /**
+     * ====getDeclaredAnnotation====
+     *
+     * ====父类中指定类型的注解（不包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=父类中不可继承的注解)
+     *
+     * ====子类中指定类型的注解（不包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=子类中不可继承的注解)
+     * null   // 当获取不到指定的注解时返回null
+     */
+    private static void test21() {
+        System.out.println("====getDeclaredAnnotation====");
+
+        System.out.println("\n====父类中指定类型的注解（不包括继承来的注解）====");
+        Annotation a1 = Parent.class.getDeclaredAnnotation(注解_不可继承_public.class);
+        System.out.println(a1);
+
+        System.out.println("\n====子类中指定类型的注解（不包括继承来的注解）====");
+        Annotation a2 = Child.class.getDeclaredAnnotation(注解_不可继承_public.class);
+        Annotation a3 = Child.class.getDeclaredAnnotation(注解_可继承_public.class);
+        System.out.println(a2);
+        System.out.println(a3);
+    }
+
+    /**
+     * ====getDeclaredAnnotations====
+     *
+     * ====父类中所有注解（不包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=父类中不可继承的注解)
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_default(value=父类中不可继承的注解，且只允许在当前包内使用)
+     * @com.zero.test.java.lang.clazz.模板03.注解_可继承_public(value=父类中可继承的注解)
+     * @com.zero.test.java.lang.clazz.模板03.注解_可继承_default(value=父类中可继承的注解，且只允许在当前包内使用)
+     *
+     * ====子类中所有注解（不包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=子类中不可继承的注解)
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_default(value=子类中不可继承的注解，且只允许在当前包内使用)
+     */
+    private static void test20() {
+        System.out.println("====getDeclaredAnnotations====");
+
+        System.out.println("\n====父类中所有注解（不包括继承来的注解）====");
+        Annotation[] as1 = Parent.class.getDeclaredAnnotations();
+        for (Annotation a : as1){
+            System.out.println(a);
+        }
+
+        System.out.println("\n====子类中所有注解（不包括继承来的注解）====");
+        Annotation[] as2 = Child.class.getDeclaredAnnotations();
+        for (Annotation a : as2){
+            System.out.println(a);
+        }
+    }
+
+
+    /**
+     * ====getAnnotation====
+     *
+     * ====父类中指定类型的注解（包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=父类中不可继承的注解)
+     *
+     * ====子类中指定类型的注解（包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=子类中不可继承的注解)
+     * @com.zero.test.java.lang.clazz.模板03.注解_可继承_public(value=父类中可继承的注解)
+     */
+    private static void test19() {
+        System.out.println("====getAnnotation====");
+
+        System.out.println("\n====父类中指定类型的注解（包括继承来的注解）====");
+        Annotation a1 = Parent.class.getAnnotation(注解_不可继承_public.class);
+        System.out.println(a1);
+
+        System.out.println("\n====子类中指定类型的注解（包括继承来的注解）====");
+        Annotation a2 = Child.class.getAnnotation(注解_不可继承_public.class);
+        Annotation a3 = Child.class.getAnnotation(注解_可继承_public.class);
+        System.out.println(a2);
+        System.out.println(a3);
+    }
+
+    /**
+     * ====getAnnotations====
+     *
+     * ====父类中所有注解（包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=父类中不可继承的注解)
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_default(value=父类中不可继承的注解，且只允许在当前包内使用)
+     * @com.zero.test.java.lang.clazz.模板03.注解_可继承_public(value=父类中可继承的注解)
+     * @com.zero.test.java.lang.clazz.模板03.注解_可继承_default(value=父类中可继承的注解，且只允许在当前包内使用)
+     *
+     * ====子类中所有注解（包括继承来的注解）====
+     * @com.zero.test.java.lang.clazz.模板03.注解_可继承_public(value=父类中可继承的注解)  // 继承父类
+     * @com.zero.test.java.lang.clazz.模板03.注解_可继承_default(value=父类中可继承的注解，且只允许在当前包内使用) // 继承父类
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_public(value=子类中不可继承的注解)
+     * @com.zero.test.java.lang.clazz.模板03.注解_不可继承_default(value=子类中不可继承的注解，且只允许在当前包内使用)
+     */
+    private static void test18() {
+        System.out.println("====getAnnotations====");
+
+        System.out.println("\n====父类中所有注解（包括继承来的注解）====");
+        Annotation[] as1 = Parent.class.getAnnotations();
+        for (Annotation a : as1){
+            System.out.println(a);
+        }
+
+        System.out.println("\n====子类中所有注解（包括继承来的注解）====");
+        Annotation[] as2 = Child.class.getAnnotations();
+        for (Annotation a : as2){
+            System.out.println(a);
+        }
+    }
+
+    /**
+     * ====getDeclaredConstructors====
+     * private com.zero.test.java.lang.clazz.模板02.子类(int,int,int)
+     * com.zero.test.java.lang.clazz.模板02.子类(int,int)
+     * protected com.zero.test.java.lang.clazz.模板02.子类(int)
+     * public com.zero.test.java.lang.clazz.模板02.子类()
+     *
+     * ====getDeclaredConstructor====
+     * public com.zero.test.java.lang.clazz.模板02.子类()
+     *
+     * @throws NoSuchMethodException
+     */
+    private static void test17() throws NoSuchMethodException {
+        System.out.println("\n====getDeclaredConstructors====");
+        Constructor[] constructors = 子类.class.getDeclaredConstructors();
+        for (Constructor c : constructors){
+            System.out.println(c);
+        }
+
+        System.out.println("\n====getDeclaredConstructor====");
+        Constructor constructor = 子类.class.getDeclaredConstructor();
+        System.out.println(constructor);
+    }
+
+    /**
+     * ====getConstructors====
+     * public com.zero.test.java.lang.clazz.模板02.子类()
+     *
+     * ====getConstructor====
+     * public com.zero.test.java.lang.clazz.模板02.子类()
+     *
+     * @throws NoSuchMethodException
+     */
+    private static void test16() throws NoSuchMethodException {
+        System.out.println("\n====getConstructors====");
+        Constructor[] constructors = 子类.class.getConstructors();
+        for (Constructor c : constructors){
+            System.out.println(c);
+        }
+
+        System.out.println("\n====getConstructor====");
+        Constructor constructor = 子类.class.getConstructor();
+        System.out.println(constructor);
     }
 
     /**
@@ -87,7 +401,7 @@ public class Test {
      *
      * ====getMethod====
      * 实例类方法_public
-     * Exception in thread "main" java.lang.NoSuchMethodException: com.zero.test.java.lang.clazz.实例类.实例类方法_无()
+     * Exception in thread "main" java.lang.NoSuchMethodException: com.zero.test.java.lang.clazz.模板01.实例类.实例类方法_无()
      * 	at java.lang.Class.getMethod(Class.java:1786)
      * 	at com.zero.test.java.lang.clazz.Test.main(Test.java:48)
      * @throws NoSuchMethodException
@@ -415,7 +729,7 @@ public class Test {
      * @throws IllegalAccessException
      */
     private static void test03() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
-        Class<?> aClass = Class.forName("com.zero.test.java.lang.clazz.A", false, ClassLoader.getSystemClassLoader());
+        Class<?> aClass = Class.forName("com.zero.test.java.lang.clazz.模板01.A", false, ClassLoader.getSystemClassLoader());
         System.out.println(" ==================== ");
         Object o = aClass.newInstance();
     }
@@ -435,11 +749,11 @@ public class Test {
      * @throws IllegalAccessException
      */
     private static void test02() throws ClassNotFoundException, InstantiationException, IllegalAccessException {
-        Class<?> aClass = Class.forName("com.zero.test.java.lang.clazz.A");
+        Class<?> aClass = Class.forName("com.zero.test.java.lang.clazz.模板01.A");
         System.out.println(" ==================== ");
         Object o = aClass.newInstance();
         Object o1 = aClass.newInstance();
-        Class<?> bClass = Class.forName("com.zero.test.java.lang.clazz.A");
+        Class<?> bClass = Class.forName("com.zero.test.java.lang.clazz.模板01.A");
         System.out.println(" ==================== ");
         Object o2 = bClass.newInstance();
 

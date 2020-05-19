@@ -1,4 +1,4 @@
-package com.zero.test.java.lang.clazz;
+package com.zero.test.java.lang.clazz.模板01;
 
 public abstract class 抽象类 implements 接口{
     private   class 抽象类_内部实例类_private{}

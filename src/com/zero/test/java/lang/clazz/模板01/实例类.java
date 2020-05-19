@@ -1,4 +1,4 @@
-package com.zero.test.java.lang.clazz;
+package com.zero.test.java.lang.clazz.模板01;
 
 public class 实例类 extends 抽象类{
     private   class 实例类_内部实例类_private{}
