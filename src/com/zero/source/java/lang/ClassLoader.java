@@ -679,6 +679,7 @@ public abstract class ClassLoader {
         - signer of this class matches signers for the rest of the classes in
           package.
     */
+    // 预定义类，主要是进行一些安全检查和证书设置
     private ProtectionDomain preDefineClass(String name,
                                             ProtectionDomain pd)
     {
@@ -701,7 +702,7 @@ public abstract class ClassLoader {
 
         return pd;
     }
-
+    // 从保护域中获取代码源的位置信息
     private String defineClassSourceLocation(ProtectionDomain pd)
     {
         CodeSource cs = pd.getCodeSource();
@@ -711,7 +712,7 @@ public abstract class ClassLoader {
         }
         return source;
     }
-
+    //
     private void postDefineClass(Class<?> c, ProtectionDomain pd)
     {
         if (pd.getCodeSource() != null) {
@@ -786,13 +787,18 @@ public abstract class ClassLoader {
      *          certificates than this class, or if <tt>name</tt> begins with
      *          "<tt>java.</tt>".
      */
+    // 利用存储在字节数组中的字节码去定义类
     protected final Class<?> defineClass(String name, byte[] b, int off, int len,
                                          ProtectionDomain protectionDomain)
         throws ClassFormatError
     {
+        // 预定义类，主要是进行一些安全检查和证书设置
         protectionDomain = preDefineClass(name, protectionDomain);
+        // 从保护域中获取代码源的位置信息
         String source = defineClassSourceLocation(protectionDomain);
+        // 由虚拟机调用，用来定义类（将class字节码加载到JVM）
         Class<?> c = defineClass1(name, b, off, len, protectionDomain, source);
+        // 在类定义完之后的一些收尾操作，主要是定义NamedPackage和设置签名
         postDefineClass(c, protectionDomain);
         return c;
     }
@@ -1086,6 +1092,7 @@ public abstract class ClassLoader {
      *
      * @since  1.1
      */
+    // 设置类的签名
     protected final void setSigners(Class<?> c, Object[] signers) {
         c.setSigners(signers);
     }
