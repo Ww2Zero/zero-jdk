@@ -44,6 +44,16 @@ package java.lang;
  * @author  Frank Yellin
  * @since   JDK1.0
  */
+/**
+ * 提供{@code Compiler}类以支持 Java 到本机代码编译器和相关服务。
+ * 根据设计 {@code Compiler} 类什么都没有;它充当 JIT 编译器实现的占位符。
+ *
+ * 当 Java 虚拟机首次启动时，它确定系统是否{@code Compiler}存在;
+ * {@link System#loadLibrary}被调用以加载该库。如果此加载成功，
+ * 函数名为 [@code java_lang_Compiler_start（）]将被调用。
+ *
+• <p> 如果没有可用的编译器，则这些方法将不执行任何操作。
+ */
 public final class Compiler  {
     private Compiler() {}               // don't make instances
 
