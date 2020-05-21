@@ -108,6 +108,7 @@ import java.lang.annotation.Annotation;
  *
  * @see ClassLoader#definePackage
  */
+// 反射元素  包对象
 public class Package implements java.lang.reflect.AnnotatedElement {
     /**
      * Return the name of this package.
@@ -116,6 +117,7 @@ public class Package implements java.lang.reflect.AnnotatedElement {
      *          <cite>The Java&trade; Language Specification</cite>,
      *          for example, {@code java.lang}
      */
+    // 获取包名
     public String getName() {
         return pkgName;
     }
@@ -125,6 +127,7 @@ public class Package implements java.lang.reflect.AnnotatedElement {
      * Return the title of the specification that this package implements.
      * @return the specification title, null is returned if it is not known.
      */
+    // 获取详细标题
     public String getSpecificationTitle() {
         return specTitle;
     }
@@ -138,6 +141,7 @@ public class Package implements java.lang.reflect.AnnotatedElement {
      * numbers are compared.
      * @return the specification version, null is returned if it is not known.
      */
+    // 获取详细版本
     public String getSpecificationVersion() {
         return specVersion;
     }
@@ -156,6 +160,7 @@ public class Package implements java.lang.reflect.AnnotatedElement {
      * Return the title of this package.
      * @return the title of the implementation, null is returned if it is not known.
      */
+    // 获取实现类的标题
     public String getImplementationTitle() {
         return implTitle;
     }
@@ -169,6 +174,7 @@ public class Package implements java.lang.reflect.AnnotatedElement {
      * by this vendor for this package.
      * @return the version of the implementation, null is returned if it is not known.
      */
+    //  获取实现类版本
     public String getImplementationVersion() {
         return implVersion;
     }
