@@ -56,6 +56,7 @@ import sun.reflect.annotation.AnnotationType;
  * @author  unascribed
  * @since   JDK1.0
  */
+// 包含几个通用的字段和方法，提供标准的输入和标准的输出
 public final class System {
 
     /* register the natives via the static initializer.
@@ -71,6 +72,7 @@ public final class System {
     }
 
     /** Don't let anyone instantiate this class */
+    // 构造方法私有化，不可以有本类的实例
     private System() {
     }
 
@@ -80,6 +82,7 @@ public final class System {
      * corresponds to keyboard input or another input source specified by
      * the host environment or user.
      */
+    // 标准的输入的流
     public final static InputStream in = null;
 
     /**
@@ -107,6 +110,7 @@ public final class System {
      * @see     java.io.PrintStream#println(java.lang.Object)
      * @see     java.io.PrintStream#println(java.lang.String)
      */
+    // 标准的输出流
     public final static PrintStream out = null;
 
     /**
@@ -121,10 +125,12 @@ public final class System {
      * variable <code>out</code>, has been redirected to a file or other
      * destination that is typically not continuously monitored.
      */
+    // 标准的错误输出
     public final static PrintStream err = null;
 
     /* The security manager for the system.
      */
+    // 安全管理
     private static volatile SecurityManager security = null;
 
     /**
@@ -147,6 +153,7 @@ public final class System {
      *
      * @since   JDK1.1
      */
+    // 指定输入流
     public static void setIn(InputStream in) {
         checkIO();
         setIn0(in);
@@ -171,6 +178,7 @@ public final class System {
      *
      * @since   JDK1.1
      */
+    // 设定输出流
     public static void setOut(PrintStream out) {
         checkIO();
         setOut0(out);
@@ -195,6 +203,7 @@ public final class System {
      *
      * @since   JDK1.1
      */
+    // 设置错误输出流
     public static void setErr(PrintStream err) {
         checkIO();
         setErr0(err);
@@ -209,6 +218,7 @@ public final class System {
      *
      * @since   1.6
      */
+    // 返回唯一的系统控制台
      public static Console console() {
          if (cons == null) {
              synchronized (System.class) {
@@ -243,10 +253,12 @@ public final class System {
      *
      * @since 1.5
      */
+    // 返回继承自JVM的channel
     public static Channel inheritedChannel() throws IOException {
         return SelectorProvider.provider().inheritedChannel();
     }
 
+    // 检查权限
     private static void checkIO() {
         SecurityManager sm = getSecurityManager();
         if (sm != null) {
@@ -281,6 +293,7 @@ public final class System {
      * @see SecurityManager#checkPermission
      * @see java.lang.RuntimePermission
      */
+    // 设置安全管理器
     public static
     void setSecurityManager(final SecurityManager s) {
         try {
@@ -330,6 +343,7 @@ public final class System {
      *          otherwise, <code>null</code> is returned.
      * @see     #setSecurityManager
      */
+    // 获取安全管理器
     public static SecurityManager getSecurityManager() {
         return security;
     }
@@ -350,6 +364,7 @@ public final class System {
      *          the current time and midnight, January 1, 1970 UTC.
      * @see     java.util.Date
      */
+    // 获取毫秒时间
     public static native long currentTimeMillis();
 
     /**
@@ -396,6 +411,7 @@ public final class System {
      *         high-resolution time source, in nanoseconds
      * @since 1.5
      */
+    // 获取纳秒时间
     public static native long nanoTime();
 
     /**
@@ -490,6 +506,7 @@ public final class System {
      * @exception  NullPointerException if either <code>src</code> or
      *               <code>dest</code> is <code>null</code>.
      */
+    // 数组拷贝
     public static native void arraycopy(Object src,  int  srcPos,
                                         Object dest, int destPos,
                                         int length);
@@ -624,6 +641,7 @@ public final class System {
      * @see        java.lang.SecurityManager#checkPropertiesAccess()
      * @see        java.util.Properties
      */
+    // 获取配置项
     public static Properties getProperties() {
         SecurityManager sm = getSecurityManager();
         if (sm != null) {
@@ -672,6 +690,7 @@ public final class System {
      * @see        java.lang.SecurityException
      * @see        java.lang.SecurityManager#checkPropertiesAccess()
      */
+    // 设置配置项
     public static void setProperties(Properties props) {
         SecurityManager sm = getSecurityManager();
         if (sm != null) {
@@ -710,6 +729,7 @@ public final class System {
      * @see        java.lang.SecurityManager#checkPropertyAccess(java.lang.String)
      * @see        java.lang.System#getProperties()
      */
+    // 根据指定的key获取配置
     public static String getProperty(String key) {
         checkKey(key);
         SecurityManager sm = getSecurityManager();
@@ -746,6 +766,7 @@ public final class System {
      * @see        java.lang.SecurityManager#checkPropertyAccess(java.lang.String)
      * @see        java.lang.System#getProperties()
      */
+    // 根据指定的key获取配置，获取不到时返回给定的默认值
     public static String getProperty(String key, String def) {
         checkKey(key);
         SecurityManager sm = getSecurityManager();
@@ -785,6 +806,7 @@ public final class System {
      * @see        SecurityManager#checkPermission
      * @since      1.2
      */
+    // 设置配置项
     public static String setProperty(String key, String value) {
         checkKey(key);
         SecurityManager sm = getSecurityManager();
@@ -823,6 +845,7 @@ public final class System {
      * @see        java.lang.SecurityManager#checkPropertiesAccess()
      * @since 1.5
      */
+    // 清除指定key的配置值
     public static String clearProperty(String key) {
         checkKey(key);
         SecurityManager sm = getSecurityManager();
@@ -888,6 +911,7 @@ public final class System {
      * @see    #getenv()
      * @see    ProcessBuilder#environment()
      */
+    // 获取环境变量
     public static String getenv(String name) {
         SecurityManager sm = getSecurityManager();
         if (sm != null) {
@@ -938,6 +962,7 @@ public final class System {
      * @see    ProcessBuilder#environment()
      * @since  1.5
      */
+    // 获取环境变量
     public static java.util.Map<String,String> getenv() {
         SecurityManager sm = getSecurityManager();
         if (sm != null) {
@@ -989,6 +1014,7 @@ public final class System {
      *
      * @see     java.lang.Runtime#gc()
      */
+    // 进行垃圾回收
     public static void gc() {
         Runtime.getRuntime().gc();
     }
@@ -1081,6 +1107,7 @@ public final class System {
      * @see        java.lang.Runtime#load(java.lang.String)
      * @see        java.lang.SecurityManager#checkLink(java.lang.String)
      */
+    // 根据文件名加载本地方法
     @CallerSensitive
     public static void load(String filename) {
         Runtime.getRuntime().load0(Reflection.getCallerClass(), filename);
@@ -1117,6 +1144,7 @@ public final class System {
      * @see        java.lang.Runtime#loadLibrary(java.lang.String)
      * @see        java.lang.SecurityManager#checkLink(java.lang.String)
      */
+    //根据libname加载本地方法
     @CallerSensitive
     public static void loadLibrary(String libname) {
         Runtime.getRuntime().loadLibrary0(Reflection.getCallerClass(), libname);
@@ -1152,6 +1180,7 @@ public final class System {
     /**
      * Initialize the system class.  Called after thread initialization.
      */
+    // 在线程初始化时候初始化system对象
     private static void initializeSystemClass() {
 
         // VM might invoke JNU_NewStringPlatform() to set those encoding
