@@ -68,6 +68,7 @@ package java.util;
  * @since 1.2
  */
 
+// 抽象的list类
 public abstract class AbstractList<E> extends AbstractCollection<E> implements List<E> {
     /**
      * Sole constructor.  (For invocation by subclass constructors, typically
@@ -104,6 +105,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws IllegalArgumentException if some property of this element
      *         prevents it from being added to this list
      */
+    // 将元素添加在线性表的尾部
     public boolean add(E e) {
         add(size(), e);
         return true;
@@ -114,6 +116,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      *
      * @throws IndexOutOfBoundsException {@inheritDoc}
      */
+    // 获取指定索引的元素
     abstract public E get(int index);
 
     /**
@@ -128,6 +131,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws IllegalArgumentException      {@inheritDoc}
      * @throws IndexOutOfBoundsException     {@inheritDoc}
      */
+    // 将index处的元素更新为element，并返回旧元素
     public E set(int index, E element) {
         throw new UnsupportedOperationException();
     }
@@ -144,6 +148,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws IllegalArgumentException      {@inheritDoc}
      * @throws IndexOutOfBoundsException     {@inheritDoc}
      */
+    // 将元素element添加到线性表index处
     public void add(int index, E element) {
         throw new UnsupportedOperationException();
     }
@@ -157,6 +162,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws UnsupportedOperationException {@inheritDoc}
      * @throws IndexOutOfBoundsException     {@inheritDoc}
      */
+    // 移除指定位置的元素
     public E remove(int index) {
         throw new UnsupportedOperationException();
     }
@@ -174,6 +180,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws ClassCastException   {@inheritDoc}
      * @throws NullPointerException {@inheritDoc}
      */
+    // 返回指定元素在list中位置，找不到返回-1
     public int indexOf(Object o) {
         ListIterator<E> it = listIterator();
         if (o==null) {
@@ -199,6 +206,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws ClassCastException   {@inheritDoc}
      * @throws NullPointerException {@inheritDoc}
      */
+    // 从后向前查找指定对象的位置
     public int lastIndexOf(Object o) {
         ListIterator<E> it = listIterator(size());
         if (o==null) {
@@ -230,6 +238,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws UnsupportedOperationException if the {@code clear} operation
      *         is not supported by this list
      */
+    // 清空数据
     public void clear() {
         removeRange(0, size());
     }
@@ -253,6 +262,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws IllegalArgumentException      {@inheritDoc}
      * @throws IndexOutOfBoundsException     {@inheritDoc}
      */
+    // 从指定位置开始添加list
     public boolean addAll(int index, Collection<? extends E> c) {
         rangeCheckForAdd(index);
         boolean modified = false;
@@ -284,6 +294,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      *
      * @return an iterator over the elements in this list in proper sequence
      */
+    // 返回迭代器
     public Iterator<E> iterator() {
         return new Itr();
     }
@@ -295,6 +306,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      *
      * @see #listIterator(int)
      */
+    // 返回list的迭代器
     public ListIterator<E> listIterator() {
         return listIterator(0);
     }
@@ -321,16 +333,19 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      *
      * @throws IndexOutOfBoundsException {@inheritDoc}
      */
+    // 返回当前线性表的一个增强的迭代器，且设定下一个待遍历元素为索引index处的元素
     public ListIterator<E> listIterator(final int index) {
         rangeCheckForAdd(index);
 
         return new ListItr(index);
     }
 
+    // 内部类 定义迭代器
     private class Itr implements Iterator<E> {
         /**
          * Index of element to be returned by subsequent call to next.
          */
+        // 光标
         int cursor = 0;
 
         /**
@@ -338,6 +353,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
          * previous.  Reset to -1 if this element is deleted by a call
          * to remove.
          */
+        // 最近被调用的一个元素的位置
         int lastRet = -1;
 
         /**
@@ -345,33 +361,43 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
          * List should have.  If this expectation is violated, the iterator
          * has detected concurrent modification.
          */
+        // 预期修改的数量
         int expectedModCount = modCount;
 
+        // 是否有下一个元素
         public boolean hasNext() {
             return cursor != size();
         }
-
+        // 获取下一个元素
         public E next() {
+            // 检查是否修改
             checkForComodification();
             try {
+                // 获取当前光标对应的元素
                 int i = cursor;
                 E next = get(i);
+                // 设置lastRet的值，用于remove时记录上一个访问元素
                 lastRet = i;
+                // 光标向下移动
                 cursor = i + 1;
+                // 返回获取到的元素
                 return next;
             } catch (IndexOutOfBoundsException e) {
                 checkForComodification();
                 throw new NoSuchElementException();
             }
         }
-
+        // 移除元素
         public void remove() {
             if (lastRet < 0)
                 throw new IllegalStateException();
+            // 简直是否有修改
             checkForComodification();
 
             try {
+                // 移除元素
                 AbstractList.this.remove(lastRet);
+                // 移动光标
                 if (lastRet < cursor)
                     cursor--;
                 lastRet = -1;
@@ -386,7 +412,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
                 throw new ConcurrentModificationException();
         }
     }
-
+    // 增强的迭代器
     private class ListItr extends Itr implements ListIterator<E> {
         ListItr(int index) {
             cursor = index;
@@ -480,6 +506,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @throws IllegalArgumentException if the endpoint indices are out of order
      *         {@code (fromIndex > toIndex)}
      */
+    // 返回当前线性表中的[fromIndex,toIndex]的子集合
     public List<E> subList(int fromIndex, int toIndex) {
         return (this instanceof RandomAccess ?
                 new RandomAccessSubList<>(this, fromIndex, toIndex) :
@@ -564,6 +591,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
      * @param fromIndex index of first element to be removed
      * @param toIndex index after last element to be removed
      */
+    // 移除本线性表中[fromIndex,toIndex]的元素
     protected void removeRange(int fromIndex, int toIndex) {
         ListIterator<E> it = listIterator(fromIndex);
         for (int i=0, n=toIndex-fromIndex; i<n; i++) {
@@ -610,11 +638,13 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
     }
 }
 
+// 子线性变
 class SubList<E> extends AbstractList<E> {
     private final AbstractList<E> l;
     private final int offset;
     private int size;
 
+    // 构造子线性变
     SubList(AbstractList<E> list, int fromIndex, int toIndex) {
         if (fromIndex < 0)
             throw new IndexOutOfBoundsException("fromIndex = " + fromIndex);
@@ -750,6 +780,7 @@ class SubList<E> extends AbstractList<E> {
         return new SubList<>(this, fromIndex, toIndex);
     }
 
+    // 检查index是否在线性表的坐标范围内
     private void rangeCheck(int index) {
         if (index < 0 || index >= size)
             throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
@@ -769,7 +800,7 @@ class SubList<E> extends AbstractList<E> {
             throw new ConcurrentModificationException();
     }
 }
-
+// 随机访问的子线性表
 class RandomAccessSubList<E> extends SubList<E> implements RandomAccess {
     RandomAccessSubList(AbstractList<E> list, int fromIndex, int toIndex) {
         super(list, fromIndex, toIndex);
