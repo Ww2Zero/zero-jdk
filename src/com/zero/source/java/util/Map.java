@@ -781,6 +781,9 @@ public interface Map<K,V> {
      *         (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
      * @since 1.8
      */
+    // 根据key获取值，判断值是否与value相等
+    // 若相等，则删除key，返回true
+    // 若不相等，则返回false
     default boolean remove(Object key, Object value) {
         Object curValue = get(key);
         if (!Objects.equals(curValue, value) ||
@@ -833,6 +836,8 @@ public interface Map<K,V> {
      *         or value prevents it from being stored in this map
      * @since 1.8
      */
+    // 根据key取值，判断是否和oldValue字段是否相等，
+    // 相等则将值替换为newValue，返回true 否则返回false
     default boolean replace(K key, V oldValue, V newValue) {
         Object curValue = get(key);
         if (!Objects.equals(curValue, oldValue) ||
@@ -881,6 +886,9 @@ public interface Map<K,V> {
      *         or value prevents it from being stored in this map
      * @since 1.8
      */
+    // 根据key获取值，
+    // 若获取到值，则替换为value，返回true，
+    // 若获取不到值，则返回false
     default V replace(K key, V value) {
         V curValue;
         if (((curValue = get(key)) != null) || containsKey(key)) {

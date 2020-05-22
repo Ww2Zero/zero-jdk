@@ -64,7 +64,7 @@ import java.util.Map.Entry;
  * @see Collection
  * @since 1.2
  */
-
+// 抽象的map键值对
 public abstract class AbstractMap<K,V> implements Map<K,V> {
     /**
      * Sole constructor.  (For invocation by subclass constructors, typically
@@ -81,6 +81,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * @implSpec
      * This implementation returns <tt>entrySet().size()</tt>.
      */
+    // 返回map中键值对的数量
     public int size() {
         return entrySet().size();
     }
@@ -91,6 +92,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * @implSpec
      * This implementation returns <tt>size() == 0</tt>.
      */
+    // 判断是否为空
     public boolean isEmpty() {
         return size() == 0;
     }
@@ -108,6 +110,8 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * @throws ClassCastException   {@inheritDoc}
      * @throws NullPointerException {@inheritDoc}
      */
+    // 判断map的所有的键值对中是否包含指定的value值
+    // O(n)的时间复杂度
     public boolean containsValue(Object value) {
         Iterator<Entry<K,V>> i = entrySet().iterator();
         if (value==null) {
@@ -140,6 +144,8 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * @throws ClassCastException   {@inheritDoc}
      * @throws NullPointerException {@inheritDoc}
      */
+    // 判断map的所有的键值对中是否包含key值
+    // O(n)的时间复杂度
     public boolean containsKey(Object key) {
         Iterator<Map.Entry<K,V>> i = entrySet().iterator();
         if (key==null) {
@@ -172,6 +178,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * @throws ClassCastException            {@inheritDoc}
      * @throws NullPointerException          {@inheritDoc}
      */
+    // 根据指定key获取Value值
     public V get(Object key) {
         Iterator<Entry<K,V>> i = entrySet().iterator();
         if (key==null) {
@@ -231,6 +238,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * @throws ClassCastException            {@inheritDoc}
      * @throws NullPointerException          {@inheritDoc}
      */
+    // 移除key的值并返回对应的value值
     public V remove(Object key) {
         Iterator<Entry<K,V>> i = entrySet().iterator();
         Entry<K,V> correctEntry = null;
@@ -276,6 +284,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * @throws NullPointerException          {@inheritDoc}
      * @throws IllegalArgumentException      {@inheritDoc}
      */
+    // 添加map集合到本键值对中
     public void putAll(Map<? extends K, ? extends V> m) {
         for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
             put(e.getKey(), e.getValue());
@@ -293,6 +302,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      *
      * @throws UnsupportedOperationException {@inheritDoc}
      */
+    // 清空数据
     public void clear() {
         entrySet().clear();
     }
@@ -324,7 +334,9 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * }
      *}</pre>
      */
+    // key的集合
     transient Set<K>        keySet;
+    // 键值对的集合
     transient Collection<V> values;
 
     /**
@@ -343,6 +355,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * is performed, so there is a slight chance that multiple calls to this
      * method will not all return the same set.
      */
+    // 获取Key值的Set集合
     public Set<K> keySet() {
         Set<K> ks = keySet;
         if (ks == null) {
@@ -402,6 +415,7 @@ public abstract class AbstractMap<K,V> implements Map<K,V> {
      * performed, so there is a slight chance that multiple calls to this
      * method will not all return the same collection.
      */
+    // 返回键值对的集合
     public Collection<V> values() {
         Collection<V> vals = values;
         if (vals == null) {
