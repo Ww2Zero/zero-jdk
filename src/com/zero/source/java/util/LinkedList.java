@@ -806,6 +806,7 @@ public class LinkedList<E>
      * this list is empty
      * @since 1.6
      */
+    // 移除链表的尾部节点
     public E pollLast() {
         final Node<E> l = last;
         return (l == null) ? null : unlinkLast(l);
@@ -820,6 +821,7 @@ public class LinkedList<E>
      * @param e the element to push
      * @since 1.6
      */
+    // 压入 添加到链表的头部
     public void push(E e) {
         addFirst(e);
     }
@@ -835,6 +837,7 @@ public class LinkedList<E>
      * @throws NoSuchElementException if this list is empty
      * @since 1.6
      */
+    // 推出 移除链表的头部
     public E pop() {
         return removeFirst();
     }
@@ -848,6 +851,7 @@ public class LinkedList<E>
      * @return {@code true} if the list contained the specified element
      * @since 1.6
      */
+    // 移除指定元素第一次出现的节点
     public boolean removeFirstOccurrence(Object o) {
         return remove(o);
     }
@@ -861,6 +865,7 @@ public class LinkedList<E>
      * @return {@code true} if the list contained the specified element
      * @since 1.6
      */
+    //移除指定元素最后一次出现的节点
     public boolean removeLastOccurrence(Object o) {
         if (o == null) {
             for (Node<E> x = last; x != null; x = x.prev) {
@@ -901,6 +906,7 @@ public class LinkedList<E>
      * @throws IndexOutOfBoundsException {@inheritDoc}
      * @see List#listIterator(int)
      */
+    // 从指定位置开始生成增强迭代器
     public ListIterator<E> listIterator(int index) {
         checkPositionIndex(index);
         return new ListItr(index);
@@ -928,6 +934,7 @@ public class LinkedList<E>
      *
      * @return a shallow copy of this {@code LinkedList} instance
      */
+    // 浅拷贝
     public Object clone() {
         LinkedList<E> clone = superClone();
 
@@ -957,6 +964,7 @@ public class LinkedList<E>
      * @return an array containing all of the elements in this list
      * in proper sequence
      */
+    // 转化为数组
     public Object[] toArray() {
         Object[] result = new Object[size];
         int i = 0;
@@ -1027,6 +1035,7 @@ public class LinkedList<E>
      * contains) is emitted (int), followed by all of its
      * elements (each an Object) in the proper order.
      */
+    // 保存链表为Output流
     private void writeObject(java.io.ObjectOutputStream s)
             throws java.io.IOException {
         // Write out any hidden serialization magic
@@ -1044,6 +1053,7 @@ public class LinkedList<E>
      * Reconstitutes this {@code LinkedList} instance from a stream
      * (that is, deserializes it).
      */
+    // 从input流中读取链表
     @SuppressWarnings("unchecked")
     private void readObject(java.io.ObjectInputStream s)
             throws java.io.IOException, ClassNotFoundException {
@@ -1093,6 +1103,7 @@ public class LinkedList<E>
     /**
      * A customized variant of Spliterators.IteratorSpliterator
      */
+    // 分流器
     static final class LLSpliterator<E> implements Spliterator<E> {
         static final int BATCH_UNIT = 1 << 10;  // batch array size increment
         static final int MAX_BATCH = 1 << 25;  // max batch array size;
@@ -1185,7 +1196,7 @@ public class LinkedList<E>
             return Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED;
         }
     }
-
+    // 增强迭代器
     private class ListItr implements ListIterator<E> {
         private Node<E> lastReturned;
         private Node<E> next;
