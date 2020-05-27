@@ -614,49 +614,96 @@ public class HashMap<K, V> extends AbstractMap<K, V>
      * @param evict        if false, the table is in creation mode.
      * @return previous value, or null if none
      */
-    final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
-                   boolean evict) {
-        Node<K, V>[] tab;
-        Node<K, V> p;
-        int n, i;
-        if ((tab = table) == null || (n = tab.length) == 0)
-            n = (tab = resize()).length;
-        if ((p = tab[i = (n - 1) & hash]) == null)
+    //
+    /*
+     * 添加指定key和value值到map中，并返回旧的元素
+     *
+     * 返回同位元素的旧值（在当前Map中占据相同位置的元素）
+     * 如果不存在同位元素，即插入了新元素，则返回null
+     * 如果存在同位元素，但同位元素的旧值为null，那么也返回null
+     */
+    final V putVal(int hash, K key, V value, boolean onlyIfAbsent, boolean evict) {
+        Node<K, V>[] tab;  // 指向当前哈希数组
+        Node<K, V> p;      // 指向待插入元素应当插入的位置
+        int n;             // 哈希数组的长度
+        int i;             // hash在数组中的存放位置
+        // 如果哈希数组还未初始化，或者容量无效，则需要初始化一个哈希数组
+        if ((tab = table) == null || (n = tab.length) == 0) {
+            // 初始化哈希数组，或者对哈希数组扩容，返回新的哈希数组
+            tab = resize();
+            // 赋值数组的长度
+            n = tab.length;
+        }
+        // 计算hash所在的hash数组的位置
+        i = (n - 1) & hash;
+        // p指向hash所在的哈希槽（链）上的首个元素
+        if ((p = tab[i]) == null) {
+            // 若该位置没有元素，则直接将元素添加在该位置
             tab[i] = newNode(hash, key, value, null);
+        }
+        // 如果哈希槽不为空，则需要在哈希槽后面链接更多的元素
         else {
             Node<K, V> e;
             K k;
-            if (p.hash == hash &&
-                    ((k = p.key) == key || (key != null && key.equals(k))))
+            // 判断该哈希槽的首个元素是否和要设置的元素相等
+            // 只有哈希值一致（还说明不了key是否一致），且key也相同（必要时需要用到equals()方法）时，
+            // 这里才认定是存在同位元素（在HashMap中占据相同位置的元素）
+            if (p.hash == hash && ((k = p.key) == key || (key != null && key.equals(k)))) {
                 e = p;
-            else if (p instanceof TreeNode)
+            }
+            // 首个元素不相等的时需要判断链表和二叉树中的元素
+            // 如果该哈希槽上链接的是红黑树结点，则需要调用红黑树的插入方法
+            else if (p instanceof TreeNode) {
                 e = ((TreeNode<K, V>) p).putTreeVal(this, tab, hash, key, value);
+            }
+            // 遍历哈希槽后面链接的其他元素
             else {
+                // 从链表的头部开始遍历 binCount统计的是插入新元素之前遍历过的元素数量
                 for (int binCount = 0; ; ++binCount) {
-                    if ((e = p.next) == null) {
+                    // 将e赋值为当前的下一个节点
+                    e = p.next;
+                    // 若没有找到同位元素，则新增一个普通的节点
+                    if (e == null) {
+                        // 新建一个节点添加在链表的尾部
                         p.next = newNode(hash, key, value, null);
-                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                        // 哈希槽（链）上的元素数量增加到TREEIFY_THRESHOLD后，这些元素进入波动期，即将从链表转换为红黑树
+                        if (binCount >= TREEIFY_THRESHOLD - 1) { // -1 for 1st
                             treeifyBin(tab, hash);
+                        }
                         break;
                     }
-                    if (e.hash == hash &&
-                            ((k = e.key) == key || (key != null && key.equals(k))))
+                    // 判断该e是否和要设置的元素相等
+                    // 只有哈希值一致（还说明不了key是否一致），且key也相同（必要时需要用到equals()方法）时，
+                    // 这里才认定是存在同位元素（在HashMap中占据相同位置的元素）
+                    if (e.hash == hash && ((k = e.key) == key || (key != null && key.equals(k)))) {
                         break;
+                    }
+                    // 移动到链表的下一个节点
                     p = e;
                 }
             }
+            // 若同位元素e不是null，则更新该位置的value值
             if (e != null) { // existing mapping for key
+                // 获取旧元素的值
                 V oldValue = e.value;
-                if (!onlyIfAbsent || oldValue == null)
+                // 如果不需要维持原状（可以覆盖旧值），或者旧值为null，则更新value值
+                if (!onlyIfAbsent || oldValue == null) {
                     e.value = value;
+                }
                 afterNodeAccess(e);
+                // 返回覆盖前的旧值
                 return oldValue;
             }
         }
+        // HashMap的更改次数加一
         ++modCount;
-        if (++size > threshold)
+        // 如果哈希数组的容量已超过阈值，则需要对哈希数组扩容
+        if (++size > threshold) {
+            // 初始化哈希数组，或者对哈希数组扩容，返回新的哈希数组
             resize();
+        }
         afterNodeInsertion(evict);
+        // 如果插入的是全新的元素，在这里返回null
         return null;
     }
 
@@ -669,47 +716,92 @@ public class HashMap<K, V> extends AbstractMap<K, V>
      *
      * @return the table
      */
+    // 初始化哈希数组，或者对哈希数组扩容，返回新的哈希数组
     final Node<K, V>[] resize() {
+        // 旧的哈希数组
         Node<K, V>[] oldTab = table;
+        // 旧的哈希数组容量
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
+        // 旧的阈值
         int oldThr = threshold;
-        int newCap, newThr = 0;
+        // 新的容量
+        int newCap = 0;
+        // 新的阈值
+        int newThr = 0;
+        // 如果哈希数组已经初始化（非首次进来）
         if (oldCap > 0) {
+            // 如果哈希表数组容量已经超过最大容量
             if (oldCap >= MAXIMUM_CAPACITY) {
+                // 将HashMap的阈值更新为允许的最大值
                 threshold = Integer.MAX_VALUE;
+                // 不需要更改哈希数组（容量未发生变化），直接返回
                 return oldTab;
-            } else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
-                    oldCap >= DEFAULT_INITIAL_CAPACITY)
-                newThr = oldThr << 1; // double threshold
-        } else if (oldThr > 0) // initial capacity was placed in threshold
-            newCap = oldThr;
-        else {               // zero initial threshold signifies using defaults
-            newCap = DEFAULT_INITIAL_CAPACITY;
-            newThr = (int) (DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
+            } else {
+                // 尝试将哈希表数组容量加倍
+                newCap = oldCap << 1;
+                // 如果容量成功加倍（没有达到上限），则将阈值也加倍
+                if (newCap < MAXIMUM_CAPACITY && oldCap >= DEFAULT_INITIAL_CAPACITY) {
+                    newThr = oldThr << 1; // double threshold
+                }
+            }
         }
+        // 如果哈希数组还未初始化（首次进来）
+        else {
+            if (oldThr > 0) {
+                // initial capacity was placed in threshold
+                // 如果实例化HashMap时已经指定了初始容量，则将哈希数组当前容量初始化为与旧阈值一样大（初始容量与旧阈值的计算关系参见tableSizeFor()方法）
+                newCap = oldThr;
+            } else {
+                // zero initial threshold signifies using defaults
+                // 如果实例化HashMap时没有指定初始容量，则使用默认的容量与阈值
+                newCap = DEFAULT_INITIAL_CAPACITY;
+                newThr = (int) (DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
+            }
+        }
+        /*
+         * 至此，如果newThr==0，则可能有以下两种情形：
+         * 1.哈希数组已经初始化，且哈希数组的容量还未超出最大容量，
+         *   但是，在执行了加倍操作后，哈希数组的容量达到了上限
+         * 2.哈希数组还未初始化，但在实例化HashMap时指定了初始容量
+         */
         if (newThr == 0) {
             float ft = (float) newCap * loadFactor;
-            newThr = (newCap < MAXIMUM_CAPACITY && ft < (float) MAXIMUM_CAPACITY ?
-                    (int) ft : Integer.MAX_VALUE);
+            newThr = (newCap < MAXIMUM_CAPACITY && ft < (float) MAXIMUM_CAPACITY
+                    ? (int) ft            // 针对第二种情况，将阈值更新为初始容量*装载因子
+                    : Integer.MAX_VALUE); // 针对第一种情况，将阈值更新为最大值
         }
+        // 更新阈值
         threshold = newThr;
+        // 至此，说明哈希数组需要初始化，或者需要扩容，即创建新的哈希数组
         @SuppressWarnings({"rawtypes", "unchecked"})
-        // 创建hash 数组
-                Node<K, V>[] newTab = (Node<K, V>[]) new Node[newCap];
+        Node<K, V>[] newTab = (Node<K, V>[]) new Node[newCap];
         table = newTab;
+        // 如果是扩容，则需要将旧元素复制到新容器
         if (oldTab != null) {
+
             for (int j = 0; j < oldCap; ++j) {
-                Node<K, V> e;
-                if ((e = oldTab[j]) != null) {
+                Node<K, V> e = oldTab[j];
+                // 如果当前哈希槽上存在元素
+                if ((e) != null) {
+                    // 置空该哈希槽
                     oldTab[j] = null;
-                    if (e.next == null)
-                        newTab[e.hash & (newCap - 1)] = e;
-                    else if (e instanceof TreeNode)
+                    // 若next为空，则该哈希槽上只有一个元素
+                    if (e.next == null) {
+                        // 由于总容量变了，所以需要重新哈希
+                        int i = e.hash & (newCap - 1);
+                        // 赋值新的位置的元素
+                        newTab[i] = e;
+                    }
+                    // 如果该哈希槽上链接了不止一个元素，且该元素是TreeNode类型
+                    else if (e instanceof TreeNode){
                         ((TreeNode<K, V>) e).split(this, newTab, j, oldCap);
+                    }
+                    // 如果该哈希槽上链接了不止一个元素，且该元素是普通Node类型
                     else { // preserve order
                         Node<K, V> loHead = null, loTail = null;
                         Node<K, V> hiHead = null, hiTail = null;
                         Node<K, V> next;
+                        // 这里跟split()操作类似，将原有的结点分成两拨，以适应新的容量需求
                         do {
                             next = e.next;
                             if ((e.hash & oldCap) == 0) {
@@ -968,6 +1060,7 @@ public class HashMap<K, V> extends AbstractMap<K, V>
         Node<K, V> e;
         return (e = getNode(hash(key), key)) == null ? defaultValue : e.value;
     }
+
     // 将指定的元素（key-value）存入HashMap，并返回旧值，不允许覆盖
     @Override
     public V putIfAbsent(K key, V value) {
