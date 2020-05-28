@@ -243,7 +243,7 @@ public class ArrayList<E> extends AbstractList<E>
         }
         return minCapacity;
     }
-
+    // 确保容器增加
     private void ensureCapacityInternal(int minCapacity) {
         int capacity = calculateCapacity(elementData, minCapacity);
         ensureExplicitCapacity(capacity);
