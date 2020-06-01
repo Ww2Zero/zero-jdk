@@ -1,20 +1,70 @@
 package com.zero.test.java.util.arraylist;
 
 import com.zero.test.util.ListUtil;
+import com.zero.test.util.TimeUtil;
 
 import java.util.ArrayList;
 import java.util.ListIterator;
 
 public class Test {
+    public static final Integer NUM_100W = 100 * 10000;
+    public static final Integer NUM_1KW = 1000 * 10000;
+
 
     public static void main(String[] args) throws IllegalAccessException {
 
 //        test01();
 //        test02();
 //        test03();
-
 //        test04();
 //        test05();
+        test06(NUM_100W);
+        test06(5 * NUM_100W);
+        test06(NUM_1KW);
+    }
+
+    /**
+     * **********
+     * 测试1000000次数据的插入
+     * [默认长度的List]-初始化List耗时：0
+     * [默认长度的List]-插入指定数量的元素耗时：29
+     * [指定长度的List]-初始化List耗时：1
+     * [指定长度的List]-插入指定数量的元素耗时：19
+     * -------------
+     * 测试5000000次数据的插入
+     * [默认长度的List]-初始化List耗时：0
+     * [默认长度的List]-插入指定数量的元素耗时：135
+     * [指定长度的List]-初始化List耗时：4
+     * [指定长度的List]-插入指定数量的元素耗时：83
+     * -------------
+     * 测试10000000次数据的插入
+     * [默认长度的List]-初始化List耗时：0
+     * [默认长度的List]-插入指定数量的元素耗时：267
+     * [指定长度的List]-初始化List耗时：3
+     * [指定长度的List]-插入指定数量的元素耗时：2140
+     * -------------
+     *
+     * @param num
+     */
+    private static void test06(int num) {
+        System.out.println("测试" + num + "次数据的插入");
+        TimeUtil timeUtil1 = new TimeUtil("默认长度的List");
+        ArrayList arrayList = new ArrayList();
+        timeUtil1.time("初始化List");
+        timeUtil1.restart();
+        for (int i = 0; i < num; i++) {
+            arrayList.add(i);
+        }
+        timeUtil1.time("插入指定数量的元素");
+        TimeUtil timeUtil2 = new TimeUtil("指定长度的List");
+        ArrayList arrayList2 = new ArrayList(num);
+        timeUtil2.time("初始化List");
+        timeUtil2.restart();
+        for (int i = 0; i < num; i++) {
+            arrayList2.add(i);
+        }
+        timeUtil2.time("插入指定数量的元素");
+        System.out.println("-------------");
     }
 
     /**
