@@ -3,6 +3,7 @@ package com.zero.test.util;
 import java.lang.reflect.Field;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 public class ListUtil {
@@ -67,4 +68,15 @@ public class ListUtil {
         }
     }
 
+    public static LinkedList<Integer> initLinkedList() {
+        return initLinkedList(10);
+    }
+
+    public static LinkedList<Integer> initLinkedList(int num) {
+        LinkedList<Integer> integers = new LinkedList<>();
+        for (int i = num; i > 0; i--) {
+            integers.add(i);
+        }
+        return integers;
+    }
 }
