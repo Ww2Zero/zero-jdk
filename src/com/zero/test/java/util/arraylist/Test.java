@@ -3,14 +3,71 @@ package com.zero.test.java.util.arraylist;
 import com.zero.test.util.ListUtil;
 
 import java.util.ArrayList;
+import java.util.ListIterator;
 
 public class Test {
 
     public static void main(String[] args) throws IllegalAccessException {
 
-        test01();
-        test02();
-        test03();
+//        test01();
+//        test02();
+//        test03();
+
+//        test04();
+//        test05();
+    }
+
+    /**
+     * 采用迭代器遍历，在遍历对过程中对arrayList进行add()/remove()时，修改modCount的同时修改expectedModCount
+     * 实现在遍历时候，同步修改arrayList的数据
+     * ***
+     * 0 = 10
+     * 1 = 2
+     * 2 = 9
+     * 3 = 2
+     * 4 = 8
+     * 5 = 2
+     * 6 = 7
+     * 7 = 2
+     * 8 = 6
+     * 9 = 2
+     * 10 = 5
+     * 11 = 2
+     * 12 = 4
+     * 13 = 2
+     * 14 = 3
+     * 15 = 2
+     * 16 = 2
+     * 17 = 2
+     * 18 = 1
+     * 19 = 2
+     */
+    private static void test05() {
+        ArrayList arrayList = ListUtil.initArrayList(10);
+        ListIterator listIterator = arrayList.listIterator();
+        while (listIterator.hasNext()) {
+            Object next = listIterator.next();
+            listIterator.add(2);
+        }
+        ListUtil.printfList(arrayList);
+    }
+
+    /**
+     * 遍历ArrayList时，对arrayList进行修改，add()/remove()时会提示错误ConcurrentModificationException
+     * <p>
+     * add()/remove()方法调用时 modCount会增加，遍历时会比较modCount是否变化来判断arrayList是否修改
+     * <p>
+     * Exception in thread "main" java.util.ConcurrentModificationException
+     * at java.util.ArrayList.forEach(ArrayList.java:1260)
+     * at com.zero.test.java.util.arraylist.Test.main(Test.java:16)
+     */
+    private static void test04() {
+        ArrayList arrayList = ListUtil.initArrayList(10);
+        for (Object o : arrayList) {
+            if (o.equals(3)) {
+                arrayList.add(5);
+            }
+        }
     }
 
     /**

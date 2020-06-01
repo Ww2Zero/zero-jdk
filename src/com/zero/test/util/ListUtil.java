@@ -15,9 +15,9 @@ public class ListUtil {
     }
 
     public static ArrayList initArrayList(int num) {
-        ArrayList<Double> integers = new ArrayList<>();
+        ArrayList<Integer> integers = new ArrayList<>();
         for (int i = num; i > 0; i--) {
-            integers.add(Math.random() * num);
+            integers.add(i);
         }
         return integers;
     }
