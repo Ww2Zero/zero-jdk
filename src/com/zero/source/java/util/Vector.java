@@ -77,16 +77,28 @@ import java.util.function.UnaryOperator;
  * implementation is not needed, it is recommended to use {@link
  * ArrayList} in place of {@code Vector}.
  *
- * @author  Lee Boynton
- * @author  Jonathan Payne
+ * @author Lee Boynton
+ * @author Jonathan Payne
  * @see Collection
  * @see LinkedList
- * @since   JDK1.0
+ * @since JDK1.0
  */
-public class Vector<E>
-    extends AbstractList<E>
-    implements List<E>, RandomAccess, Cloneable, java.io.Serializable
-{
+// 向量表 线性存储结构
+// 动态数组实现
+// 可以看做ArrayList的线程安全版本
+public class Vector<E> extends AbstractList<E> implements List<E>, RandomAccess, Cloneable, java.io.Serializable {
+    /**
+     * use serialVersionUID from JDK 1.0.2 for interoperability
+     */
+    private static final long serialVersionUID = -2767605614048989439L;
+    /**
+     * The maximum size of array to allocate.
+     * Some VMs reserve some header words in an array.
+     * Attempts to allocate larger arrays may result in
+     * OutOfMemoryError: Requested array size exceeds VM limit
+     */
+    // 允许存储的最大容量
+    private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
     /**
      * The array buffer into which the components of the vector are
      * stored. The capacity of the vector is the length of this array buffer,
@@ -96,8 +108,8 @@ public class Vector<E>
      *
      * @serial
      */
+    // 存储数据的数组
     protected Object[] elementData;
-
     /**
      * The number of valid components in this {@code Vector} object.
      * Components {@code elementData[0]} through
@@ -105,8 +117,8 @@ public class Vector<E>
      *
      * @serial
      */
+    // 存储元素的数量
     protected int elementCount;
-
     /**
      * The amount by which the capacity of the vector is automatically
      * incremented when its size becomes greater than its capacity.  If
@@ -115,26 +127,25 @@ public class Vector<E>
      *
      * @serial
      */
+    // 扩容增量 当容量大于vector容量时增加容量，若扩容增量小于或等于0，则扩容时容量翻倍
     protected int capacityIncrement;
-
-    /** use serialVersionUID from JDK 1.0.2 for interoperability */
-    private static final long serialVersionUID = -2767605614048989439L;
 
     /**
      * Constructs an empty vector with the specified initial capacity and
      * capacity increment.
      *
-     * @param   initialCapacity     the initial capacity of the vector
-     * @param   capacityIncrement   the amount by which the capacity is
-     *                              increased when the vector overflows
+     * @param initialCapacity   the initial capacity of the vector
+     * @param capacityIncrement the amount by which the capacity is
+     *                          increased when the vector overflows
      * @throws IllegalArgumentException if the specified initial capacity
-     *         is negative
+     *                                  is negative
      */
+    // 指定初始容量和指定扩容增量的向量表
     public Vector(int initialCapacity, int capacityIncrement) {
         super();
         if (initialCapacity < 0)
-            throw new IllegalArgumentException("Illegal Capacity: "+
-                                               initialCapacity);
+            throw new IllegalArgumentException("Illegal Capacity: " +
+                    initialCapacity);
         this.elementData = new Object[initialCapacity];
         this.capacityIncrement = capacityIncrement;
     }
@@ -143,10 +154,11 @@ public class Vector<E>
      * Constructs an empty vector with the specified initial capacity and
      * with its capacity increment equal to zero.
      *
-     * @param   initialCapacity   the initial capacity of the vector
+     * @param initialCapacity the initial capacity of the vector
      * @throws IllegalArgumentException if the specified initial capacity
-     *         is negative
+     *                                  is negative
      */
+    //指定初始容量和扩容增量为0的向量表
     public Vector(int initialCapacity) {
         this(initialCapacity, 0);
     }
@@ -156,6 +168,7 @@ public class Vector<E>
      * has size {@code 10} and its standard capacity increment is
      * zero.
      */
+    // 指定初始化容量为10，扩容增量为0的向量表
     public Vector() {
         this(10);
     }
@@ -166,10 +179,11 @@ public class Vector<E>
      * iterator.
      *
      * @param c the collection whose elements are to be placed into this
-     *       vector
+     *          vector
      * @throws NullPointerException if the specified collection is null
-     * @since   1.2
+     * @since 1.2
      */
+    // 根据指定的集合构造向量表
     public Vector(Collection<? extends E> c) {
         elementData = c.toArray();
         elementCount = elementData.length;
@@ -177,20 +191,29 @@ public class Vector<E>
         if (elementData.getClass() != Object[].class)
             elementData = Arrays.copyOf(elementData, elementCount, Object[].class);
     }
+    // 计算minCapacity是否超过最大容量
+    private static int hugeCapacity(int minCapacity) {
+        if (minCapacity < 0) // overflow
+            throw new OutOfMemoryError();
+        return (minCapacity > MAX_ARRAY_SIZE) ?
+                Integer.MAX_VALUE :
+                MAX_ARRAY_SIZE;
+    }
 
     /**
      * Copies the components of this vector into the specified array.
      * The item at index {@code k} in this vector is copied into
      * component {@code k} of {@code anArray}.
      *
-     * @param  anArray the array into which the components get copied
-     * @throws NullPointerException if the given array is null
+     * @param anArray the array into which the components get copied
+     * @throws NullPointerException      if the given array is null
      * @throws IndexOutOfBoundsException if the specified array is not
-     *         large enough to hold all the components of this vector
-     * @throws ArrayStoreException if a component of this vector is not of
-     *         a runtime type that can be stored in the specified array
+     *                                   large enough to hold all the components of this vector
+     * @throws ArrayStoreException       if a component of this vector is not of
+     *                                   a runtime type that can be stored in the specified array
      * @see #toArray(Object[])
      */
+    // 拷贝当前向量表到指定的数组中
     public synchronized void copyInto(Object[] anArray) {
         System.arraycopy(elementData, 0, anArray, 0, elementCount);
     }
@@ -203,6 +226,7 @@ public class Vector<E>
      * with a smaller one. An application can use this operation to
      * minimize the storage of a vector.
      */
+    // 缩减向量表的容量为刚好容纳当前所有的元素
     public synchronized void trimToSize() {
         modCount++;
         int oldCapacity = elementData.length;
@@ -228,6 +252,7 @@ public class Vector<E>
      *
      * @param minCapacity the desired minimum capacity
      */
+    // 确保容量至少拥有minCapacity的容量
     public synchronized void ensureCapacity(int minCapacity) {
         if (minCapacity > 0) {
             modCount++;
@@ -243,38 +268,24 @@ public class Vector<E>
      *
      * @see #ensureCapacity(int)
      */
+    // 确保容量至少有minCapacity的容量
     private void ensureCapacityHelper(int minCapacity) {
         // overflow-conscious code
         if (minCapacity - elementData.length > 0)
             grow(minCapacity);
     }
 
-    /**
-     * The maximum size of array to allocate.
-     * Some VMs reserve some header words in an array.
-     * Attempts to allocate larger arrays may result in
-     * OutOfMemoryError: Requested array size exceeds VM limit
-     */
-    private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
-
+    // 增长容量
     private void grow(int minCapacity) {
         // overflow-conscious code
         int oldCapacity = elementData.length;
         int newCapacity = oldCapacity + ((capacityIncrement > 0) ?
-                                         capacityIncrement : oldCapacity);
+                capacityIncrement : oldCapacity);
         if (newCapacity - minCapacity < 0)
             newCapacity = minCapacity;
         if (newCapacity - MAX_ARRAY_SIZE > 0)
             newCapacity = hugeCapacity(minCapacity);
         elementData = Arrays.copyOf(elementData, newCapacity);
-    }
-
-    private static int hugeCapacity(int minCapacity) {
-        if (minCapacity < 0) // overflow
-            throw new OutOfMemoryError();
-        return (minCapacity > MAX_ARRAY_SIZE) ?
-            Integer.MAX_VALUE :
-            MAX_ARRAY_SIZE;
     }
 
     /**
@@ -283,15 +294,18 @@ public class Vector<E>
      * the vector. If the new size is less than the current size, all
      * components at index {@code newSize} and greater are discarded.
      *
-     * @param  newSize   the new size of this vector
+     * @param newSize the new size of this vector
      * @throws ArrayIndexOutOfBoundsException if the new size is negative
      */
+    // 设置向量表的容量
+    // 若newSize大于当前的容量，则进行扩容
+    // 若newSize小于当前的容量，则将[newSize,elementCount)区间的元素设置为null，回收其空间
     public synchronized void setSize(int newSize) {
         modCount++;
         if (newSize > elementCount) {
             ensureCapacityHelper(newSize);
         } else {
-            for (int i = newSize ; i < elementCount ; i++) {
+            for (int i = newSize; i < elementCount; i++) {
                 elementData[i] = null;
             }
         }
@@ -301,10 +315,11 @@ public class Vector<E>
     /**
      * Returns the current capacity of this vector.
      *
-     * @return  the current capacity (the length of its internal
-     *          data array, kept in the field {@code elementData}
-     *          of this vector)
+     * @return the current capacity (the length of its internal
+     * data array, kept in the field {@code elementData}
+     * of this vector)
      */
+    // 返回当前向量表中数组的长度
     public synchronized int capacity() {
         return elementData.length;
     }
@@ -312,8 +327,9 @@ public class Vector<E>
     /**
      * Returns the number of components in this vector.
      *
-     * @return  the number of components in this vector
+     * @return the number of components in this vector
      */
+    // 返回当前向量表中元素的数量
     public synchronized int size() {
         return elementCount;
     }
@@ -321,10 +337,11 @@ public class Vector<E>
     /**
      * Tests if this vector has no components.
      *
-     * @return  {@code true} if and only if this vector has
-     *          no components, that is, its size is zero;
-     *          {@code false} otherwise.
+     * @return {@code true} if and only if this vector has
+     * no components, that is, its size is zero;
+     * {@code false} otherwise.
      */
+    // 返回向量表是否为空
     public synchronized boolean isEmpty() {
         return elementCount == 0;
     }
@@ -335,9 +352,10 @@ public class Vector<E>
      * this vector. The first item generated is the item at index {@code 0},
      * then the item at index {@code 1}, and so on.
      *
-     * @return  an enumeration of the components of this vector
-     * @see     Iterator
+     * @return an enumeration of the components of this vector
+     * @see Iterator
      */
+    // 返回向量表中所有元素的视图，支持枚举遍历
     public Enumeration<E> elements() {
         return new Enumeration<E>() {
             int count = 0;
@@ -366,6 +384,7 @@ public class Vector<E>
      * @param o element whose presence in this vector is to be tested
      * @return {@code true} if this vector contains the specified element
      */
+    // 判断向量表中是否包含指定对象
     public boolean contains(Object o) {
         return indexOf(o, 0) >= 0;
     }
@@ -379,8 +398,10 @@ public class Vector<E>
      *
      * @param o element to search for
      * @return the index of the first occurrence of the specified element in
-     *         this vector, or -1 if this vector does not contain the element
+     * this vector, or -1 if this vector does not contain the element
      */
+    // 从index：0开始从前向后查找，返回指定对象在向量表的位置
+    // 找不到则返回-1
     public int indexOf(Object o) {
         return indexOf(o, 0);
     }
@@ -393,21 +414,23 @@ public class Vector<E>
      * <tt>(i&nbsp;&gt;=&nbsp;index&nbsp;&amp;&amp;&nbsp;(o==null&nbsp;?&nbsp;get(i)==null&nbsp;:&nbsp;o.equals(get(i))))</tt>,
      * or -1 if there is no such index.
      *
-     * @param o element to search for
+     * @param o     element to search for
      * @param index index to start searching from
      * @return the index of the first occurrence of the element in
-     *         this vector at position {@code index} or later in the vector;
-     *         {@code -1} if the element is not found.
+     * this vector at position {@code index} or later in the vector;
+     * {@code -1} if the element is not found.
      * @throws IndexOutOfBoundsException if the specified index is negative
-     * @see     Object#equals(Object)
+     * @see Object#equals(Object)
      */
+    // 从index开始从前向后查找，返回指定对象在向量表的位置
+    // 找不到则返回-1
     public synchronized int indexOf(Object o, int index) {
         if (o == null) {
-            for (int i = index ; i < elementCount ; i++)
-                if (elementData[i]==null)
+            for (int i = index; i < elementCount; i++)
+                if (elementData[i] == null)
                     return i;
         } else {
-            for (int i = index ; i < elementCount ; i++)
+            for (int i = index; i < elementCount; i++)
                 if (o.equals(elementData[i]))
                     return i;
         }
@@ -423,10 +446,12 @@ public class Vector<E>
      *
      * @param o element to search for
      * @return the index of the last occurrence of the specified element in
-     *         this vector, or -1 if this vector does not contain the element
+     * this vector, or -1 if this vector does not contain the element
      */
+    // 从最后一个位置开始从后向前查找，返回指定对象在向量表的位置
+    // 找不到则返回-1
     public synchronized int lastIndexOf(Object o) {
-        return lastIndexOf(o, elementCount-1);
+        return lastIndexOf(o, elementCount - 1);
     }
 
     /**
@@ -437,21 +462,23 @@ public class Vector<E>
      * <tt>(i&nbsp;&lt;=&nbsp;index&nbsp;&amp;&amp;&nbsp;(o==null&nbsp;?&nbsp;get(i)==null&nbsp;:&nbsp;o.equals(get(i))))</tt>,
      * or -1 if there is no such index.
      *
-     * @param o element to search for
+     * @param o     element to search for
      * @param index index to start searching backwards from
      * @return the index of the last occurrence of the element at position
-     *         less than or equal to {@code index} in this vector;
-     *         -1 if the element is not found.
+     * less than or equal to {@code index} in this vector;
+     * -1 if the element is not found.
      * @throws IndexOutOfBoundsException if the specified index is greater
-     *         than or equal to the current size of this vector
+     *                                   than or equal to the current size of this vector
      */
+    // 从后向前的index位置开始查找，返回指定对象在向量表的位置
+    // 找不到则返回-1
     public synchronized int lastIndexOf(Object o, int index) {
         if (index >= elementCount)
-            throw new IndexOutOfBoundsException(index + " >= "+ elementCount);
+            throw new IndexOutOfBoundsException(index + " >= " + elementCount);
 
         if (o == null) {
             for (int i = index; i >= 0; i--)
-                if (elementData[i]==null)
+                if (elementData[i] == null)
                     return i;
         } else {
             for (int i = index; i >= 0; i--)
@@ -467,11 +494,12 @@ public class Vector<E>
      * <p>This method is identical in functionality to the {@link #get(int)}
      * method (which is part of the {@link List} interface).
      *
-     * @param      index   an index into this vector
-     * @return     the component at the specified index
+     * @param index an index into this vector
+     * @return the component at the specified index
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index >= size()})
+     *                                        ({@code index < 0 || index >= size()})
      */
+    // 返回指定位置的元素
     public synchronized E elementAt(int index) {
         if (index >= elementCount) {
             throw new ArrayIndexOutOfBoundsException(index + " >= " + elementCount);
@@ -484,9 +512,10 @@ public class Vector<E>
      * Returns the first component (the item at index {@code 0}) of
      * this vector.
      *
-     * @return     the first component of this vector
+     * @return the first component of this vector
      * @throws NoSuchElementException if this vector has no components
      */
+    // 返回第一个元素
     public synchronized E firstElement() {
         if (elementCount == 0) {
             throw new NoSuchElementException();
@@ -497,10 +526,11 @@ public class Vector<E>
     /**
      * Returns the last component of the vector.
      *
-     * @return  the last component of the vector, i.e., the component at index
-     *          <code>size()&nbsp;-&nbsp;1</code>.
+     * @return the last component of the vector, i.e., the component at index
+     * <code>size()&nbsp;-&nbsp;1</code>.
      * @throws NoSuchElementException if this vector is empty
      */
+    // 返回最后一个元素
     public synchronized E lastElement() {
         if (elementCount == 0) {
             throw new NoSuchElementException();
@@ -523,15 +553,16 @@ public class Vector<E>
      * match array usage.  Note also that the {@code set} method returns the
      * old value that was stored at the specified position.
      *
-     * @param      obj     what the component is to be set to
-     * @param      index   the specified index
+     * @param obj   what the component is to be set to
+     * @param index the specified index
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index >= size()})
+     *                                        ({@code index < 0 || index >= size()})
      */
+    // 修改指定位置的元素
     public synchronized void setElementAt(E obj, int index) {
         if (index >= elementCount) {
             throw new ArrayIndexOutOfBoundsException(index + " >= " +
-                                                     elementCount);
+                    elementCount);
         }
         elementData[index] = obj;
     }
@@ -551,21 +582,22 @@ public class Vector<E>
      * {@code remove} method returns the old value that was stored at the
      * specified position.
      *
-     * @param      index   the index of the object to remove
+     * @param index the index of the object to remove
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index >= size()})
+     *                                        ({@code index < 0 || index >= size()})
      */
+    // 移除指定位置的元素
     public synchronized void removeElementAt(int index) {
         modCount++;
         if (index >= elementCount) {
             throw new ArrayIndexOutOfBoundsException(index + " >= " +
-                                                     elementCount);
-        }
-        else if (index < 0) {
+                    elementCount);
+        } else if (index < 0) {
             throw new ArrayIndexOutOfBoundsException(index);
         }
         int j = elementCount - index - 1;
         if (j > 0) {
+            // 将index+1开始的元素拷贝到从index开始位置，元素向前移动一步
             System.arraycopy(elementData, index + 1, elementData, index, j);
         }
         elementCount--;
@@ -590,20 +622,25 @@ public class Vector<E>
      * {@code add} method reverses the order of the parameters, to more closely
      * match array usage.
      *
-     * @param      obj     the component to insert
-     * @param      index   where to insert the new component
+     * @param obj   the component to insert
+     * @param index where to insert the new component
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index > size()})
+     *                                        ({@code index < 0 || index > size()})
      */
+    // 在指定位置插入元素
     public synchronized void insertElementAt(E obj, int index) {
         modCount++;
         if (index > elementCount) {
             throw new ArrayIndexOutOfBoundsException(index
-                                                     + " > " + elementCount);
+                    + " > " + elementCount);
         }
+        // 确保容量足够装下新的元素
         ensureCapacityHelper(elementCount + 1);
+        // 将index之后元素前后移动一步，空出index的位置
         System.arraycopy(elementData, index, elementData, index + 1, elementCount - index);
+        // 设置index位置为需要设置的对象
         elementData[index] = obj;
+        // 增加修改量
         elementCount++;
     }
 
@@ -616,8 +653,9 @@ public class Vector<E>
      * {@link #add(Object) add(E)}
      * method (which is part of the {@link List} interface).
      *
-     * @param   obj   the component to be added
+     * @param obj the component to be added
      */
+    // 在向量表最后添加元素
     public synchronized void addElement(E obj) {
         modCount++;
         ensureCapacityHelper(elementCount + 1);
@@ -635,14 +673,17 @@ public class Vector<E>
      * {@link #remove(Object)} method (which is part of the
      * {@link List} interface).
      *
-     * @param   obj   the component to be removed
-     * @return  {@code true} if the argument was a component of this
-     *          vector; {@code false} otherwise.
+     * @param obj the component to be removed
+     * @return {@code true} if the argument was a component of this
+     * vector; {@code false} otherwise.
      */
+    // 移除指定元素
     public synchronized boolean removeElement(Object obj) {
         modCount++;
+        // 找到指定元素的位置
         int i = indexOf(obj);
         if (i >= 0) {
+            // 移除指定位置的元素
             removeElementAt(i);
             return true;
         }
@@ -655,6 +696,7 @@ public class Vector<E>
      * <p>This method is identical in functionality to the {@link #clear}
      * method (which is part of the {@link List} interface).
      */
+    // 移除所有的元素
     public synchronized void removeAllElements() {
         modCount++;
         // Let gc do its work
@@ -669,12 +711,13 @@ public class Vector<E>
      * reference to a clone of the internal data array, not a reference
      * to the original internal data array of this {@code Vector} object.
      *
-     * @return  a clone of this vector
+     * @return a clone of this vector
      */
+    // 浅拷贝
     public synchronized Object clone() {
         try {
             @SuppressWarnings("unchecked")
-                Vector<E> v = (Vector<E>) super.clone();
+            Vector<E> v = (Vector<E>) super.clone();
             v.elementData = Arrays.copyOf(elementData, elementCount);
             v.modCount = 0;
             return v;
@@ -690,6 +733,7 @@ public class Vector<E>
      *
      * @since 1.2
      */
+    // 返回向量表的数组
     public synchronized Object[] toArray() {
         return Arrays.copyOf(elementData, elementCount);
     }
@@ -712,12 +756,13 @@ public class Vector<E>
      *          be stored, if it is big enough; otherwise, a new array of the
      *          same runtime type is allocated for this purpose.
      * @return an array containing the elements of the Vector
-     * @throws ArrayStoreException if the runtime type of a is not a supertype
-     * of the runtime type of every element in this Vector
+     * @throws ArrayStoreException  if the runtime type of a is not a supertype
+     *                              of the runtime type of every element in this Vector
      * @throws NullPointerException if the given array is null
      * @since 1.2
      */
     @SuppressWarnings("unchecked")
+    // 将向量表中的数据存放在指定的数组中
     public synchronized <T> T[] toArray(T[] a) {
         if (a.length < elementCount)
             return (T[]) Arrays.copyOf(elementData, elementCount, a.getClass());
@@ -743,9 +788,10 @@ public class Vector<E>
      * @param index index of the element to return
      * @return object at the specified index
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *            ({@code index < 0 || index >= size()})
+     *                                        ({@code index < 0 || index >= size()})
      * @since 1.2
      */
+    // 获取指定位置的元素
     public synchronized E get(int index) {
         if (index >= elementCount)
             throw new ArrayIndexOutOfBoundsException(index);
@@ -757,13 +803,14 @@ public class Vector<E>
      * Replaces the element at the specified position in this Vector with the
      * specified element.
      *
-     * @param index index of the element to replace
+     * @param index   index of the element to replace
      * @param element element to be stored at the specified position
      * @return the element previously at the specified position
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index >= size()})
+     *                                        ({@code index < 0 || index >= size()})
      * @since 1.2
      */
+    // 修改向量表中指定位置index的元素为指定元素element
     public synchronized E set(int index, E element) {
         if (index >= elementCount)
             throw new ArrayIndexOutOfBoundsException(index);
@@ -780,6 +827,7 @@ public class Vector<E>
      * @return {@code true} (as specified by {@link Collection#add})
      * @since 1.2
      */
+    // 在向量表结尾添加指定的元素
     public synchronized boolean add(E e) {
         modCount++;
         ensureCapacityHelper(elementCount + 1);
@@ -798,6 +846,7 @@ public class Vector<E>
      * @return true if the Vector contained the specified element
      * @since 1.2
      */
+    // 移除第一个出现的指定元素
     public boolean remove(Object o) {
         return removeElement(o);
     }
@@ -807,12 +856,13 @@ public class Vector<E>
      * Shifts the element currently at that position (if any) and any
      * subsequent elements to the right (adds one to their indices).
      *
-     * @param index index at which the specified element is to be inserted
+     * @param index   index at which the specified element is to be inserted
      * @param element element to be inserted
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index > size()})
+     *                                        ({@code index < 0 || index > size()})
      * @since 1.2
      */
+    // 在指定位置添加指定的元素
     public void add(int index, E element) {
         insertElementAt(element, index);
     }
@@ -822,12 +872,13 @@ public class Vector<E>
      * Shifts any subsequent elements to the left (subtracts one from their
      * indices).  Returns the element that was removed from the Vector.
      *
-     * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index >= size()})
      * @param index the index of the element to be removed
      * @return element that was removed
+     * @throws ArrayIndexOutOfBoundsException if the index is out of range
+     *                                        ({@code index < 0 || index >= size()})
      * @since 1.2
      */
+    // 移除指定位置的元素
     public synchronized E remove(int index) {
         modCount++;
         if (index >= elementCount)
@@ -836,8 +887,8 @@ public class Vector<E>
 
         int numMoved = elementCount - index - 1;
         if (numMoved > 0)
-            System.arraycopy(elementData, index+1, elementData, index,
-                             numMoved);
+            System.arraycopy(elementData, index + 1, elementData, index,
+                    numMoved);
         elementData[--elementCount] = null; // Let gc do its work
 
         return oldValue;
@@ -849,6 +900,7 @@ public class Vector<E>
      *
      * @since 1.2
      */
+    // 清空向量表
     public void clear() {
         removeAllElements();
     }
@@ -859,12 +911,13 @@ public class Vector<E>
      * Returns true if this Vector contains all of the elements in the
      * specified Collection.
      *
-     * @param   c a collection whose elements will be tested for containment
+     * @param c a collection whose elements will be tested for containment
      *          in this Vector
      * @return true if this Vector contains all of the elements in the
-     *         specified collection
+     * specified collection
      * @throws NullPointerException if the specified collection is null
      */
+    // 判断向量表中是否包含指定集合
     public synchronized boolean containsAll(Collection<?> c) {
         return super.containsAll(c);
     }
@@ -882,6 +935,7 @@ public class Vector<E>
      * @throws NullPointerException if the specified collection is null
      * @since 1.2
      */
+    // 在向量表的结尾添加指定集合的元素
     public synchronized boolean addAll(Collection<? extends E> c) {
         modCount++;
         Object[] a = c.toArray();
@@ -898,17 +952,18 @@ public class Vector<E>
      *
      * @param c a collection of elements to be removed from the Vector
      * @return true if this Vector changed as a result of the call
-     * @throws ClassCastException if the types of one or more elements
-     *         in this vector are incompatible with the specified
-     *         collection
-     * (<a href="Collection.html#optional-restrictions">optional</a>)
+     * @throws ClassCastException   if the types of one or more elements
+     *                              in this vector are incompatible with the specified
+     *                              collection
+     *                              (<a href="Collection.html#optional-restrictions">optional</a>)
      * @throws NullPointerException if this vector contains one or more null
-     *         elements and the specified collection does not support null
-     *         elements
-     * (<a href="Collection.html#optional-restrictions">optional</a>),
-     *         or if the specified collection is null
+     *                              elements and the specified collection does not support null
+     *                              elements
+     *                              (<a href="Collection.html#optional-restrictions">optional</a>),
+     *                              or if the specified collection is null
      * @since 1.2
      */
+    // 在向量表中移除指定集合的元素
     public synchronized boolean removeAll(Collection<?> c) {
         return super.removeAll(c);
     }
@@ -921,17 +976,18 @@ public class Vector<E>
      * @param c a collection of elements to be retained in this Vector
      *          (all other elements are removed)
      * @return true if this Vector changed as a result of the call
-     * @throws ClassCastException if the types of one or more elements
-     *         in this vector are incompatible with the specified
-     *         collection
-     * (<a href="Collection.html#optional-restrictions">optional</a>)
+     * @throws ClassCastException   if the types of one or more elements
+     *                              in this vector are incompatible with the specified
+     *                              collection
+     *                              (<a href="Collection.html#optional-restrictions">optional</a>)
      * @throws NullPointerException if this vector contains one or more null
-     *         elements and the specified collection does not support null
-     *         elements
-     *         (<a href="Collection.html#optional-restrictions">optional</a>),
-     *         or if the specified collection is null
+     *                              elements and the specified collection does not support null
+     *                              elements
+     *                              (<a href="Collection.html#optional-restrictions">optional</a>),
+     *                              or if the specified collection is null
      * @since 1.2
      */
+    // 确保向量表中只包含指定集合的元素，移除所有其他元素
     public synchronized boolean retainAll(Collection<?> c) {
         return super.retainAll(c);
     }
@@ -946,13 +1002,14 @@ public class Vector<E>
      *
      * @param index index at which to insert the first element from the
      *              specified collection
-     * @param c elements to be inserted into this Vector
+     * @param c     elements to be inserted into this Vector
      * @return {@code true} if this Vector changed as a result of the call
      * @throws ArrayIndexOutOfBoundsException if the index is out of range
-     *         ({@code index < 0 || index > size()})
-     * @throws NullPointerException if the specified collection is null
+     *                                        ({@code index < 0 || index > size()})
+     * @throws NullPointerException           if the specified collection is null
      * @since 1.2
      */
+    // 在指定位置添加指定集合
     public synchronized boolean addAll(int index, Collection<? extends E> c) {
         modCount++;
         if (index < 0 || index > elementCount)
@@ -965,7 +1022,7 @@ public class Vector<E>
         int numMoved = elementCount - index;
         if (numMoved > 0)
             System.arraycopy(elementData, index, elementData, index + numNew,
-                             numMoved);
+                    numMoved);
 
         System.arraycopy(a, 0, elementData, index, numNew);
         elementCount += numNew;
@@ -1030,16 +1087,17 @@ public class Vector<E>
      * a fashion that iterations in progress may yield incorrect results.)
      *
      * @param fromIndex low endpoint (inclusive) of the subList
-     * @param toIndex high endpoint (exclusive) of the subList
+     * @param toIndex   high endpoint (exclusive) of the subList
      * @return a view of the specified range within this List
      * @throws IndexOutOfBoundsException if an endpoint index value is out of range
-     *         {@code (fromIndex < 0 || toIndex > size)}
-     * @throws IllegalArgumentException if the endpoint indices are out of order
-     *         {@code (fromIndex > toIndex)}
+     *                                   {@code (fromIndex < 0 || toIndex > size)}
+     * @throws IllegalArgumentException  if the endpoint indices are out of order
+     *                                   {@code (fromIndex > toIndex)}
      */
+    // 返回向量表指定区间的子列表，修改子列表时本向量表也会受影响
     public synchronized List<E> subList(int fromIndex, int toIndex) {
         return Collections.synchronizedList(super.subList(fromIndex, toIndex),
-                                            this);
+                this);
     }
 
     /**
@@ -1049,14 +1107,16 @@ public class Vector<E>
      * This call shortens the list by {@code (toIndex - fromIndex)} elements.
      * (If {@code toIndex==fromIndex}, this operation has no effect.)
      */
+    // 移除指定指定区间的元素
     protected synchronized void removeRange(int fromIndex, int toIndex) {
         modCount++;
         int numMoved = elementCount - toIndex;
+        // 将toIndex后的元素移动到从fromIndex开始地方
         System.arraycopy(elementData, toIndex, elementData, fromIndex,
-                         numMoved);
+                numMoved);
 
         // Let gc do its work
-        int newElementCount = elementCount - (toIndex-fromIndex);
+        int newElementCount = elementCount - (toIndex - fromIndex);
         while (elementCount != newElementCount)
             elementData[--elementCount] = null;
     }
@@ -1068,15 +1128,15 @@ public class Vector<E>
      * of the fields.
      *
      * @param in the stream
-     * @throws java.io.IOException if an I/O error occurs
+     * @throws java.io.IOException    if an I/O error occurs
      * @throws ClassNotFoundException if the stream contains data
-     *         of a non-existing class
+     *                                of a non-existing class
      */
     private void readObject(ObjectInputStream in)
             throws IOException, ClassNotFoundException {
         ObjectInputStream.GetField gfields = in.readFields();
         int count = gfields.get("elementCount", 0);
-        Object[] data = (Object[])gfields.get("elementData", null);
+        Object[] data = (Object[]) gfields.get("elementData", null);
         if (count < 0 || data == null || count > data.length) {
             throw new StreamCorruptedException("Inconsistent vector internals");
         }
@@ -1115,9 +1175,10 @@ public class Vector<E>
      *
      * @throws IndexOutOfBoundsException {@inheritDoc}
      */
+    // 返回从指定位置开始迭代器
     public synchronized ListIterator<E> listIterator(int index) {
         if (index < 0 || index > elementCount)
-            throw new IndexOutOfBoundsException("Index: "+index);
+            throw new IndexOutOfBoundsException("Index: " + index);
         return new ListItr(index);
     }
 
@@ -1129,6 +1190,7 @@ public class Vector<E>
      *
      * @see #listIterator(int)
      */
+    // 返回从头开始的迭代器
     public synchronized ListIterator<E> listIterator() {
         return new ListItr(0);
     }
@@ -1142,6 +1204,203 @@ public class Vector<E>
      */
     public synchronized Iterator<E> iterator() {
         return new Itr();
+    }
+
+    // 遍历向量表，并调用action，以元素为参数
+    @Override
+    public synchronized void forEach(Consumer<? super E> action) {
+        Objects.requireNonNull(action);
+        final int expectedModCount = modCount;
+        @SuppressWarnings("unchecked") final E[] elementData = (E[]) this.elementData;
+        final int elementCount = this.elementCount;
+        for (int i = 0; modCount == expectedModCount && i < elementCount; i++) {
+            action.accept(elementData[i]);
+        }
+        if (modCount != expectedModCount) {
+            throw new ConcurrentModificationException();
+        }
+    }
+
+    // 遍历元素，判断filter.test(element)返回值，若为true则移除该元素
+    @Override
+    @SuppressWarnings("unchecked")
+    public synchronized boolean removeIf(Predicate<? super E> filter) {
+        Objects.requireNonNull(filter);
+        // figure out which elements are to be removed
+        // any exception thrown from the filter predicate at this stage
+        // will leave the collection unmodified
+        int removeCount = 0;
+        final int size = elementCount;
+        final BitSet removeSet = new BitSet(size);
+        final int expectedModCount = modCount;
+        for (int i = 0; modCount == expectedModCount && i < size; i++) {
+            @SuppressWarnings("unchecked") final E element = (E) elementData[i];
+            if (filter.test(element)) {
+                removeSet.set(i);
+                removeCount++;
+            }
+        }
+        if (modCount != expectedModCount) {
+            throw new ConcurrentModificationException();
+        }
+
+        // shift surviving elements left over the spaces left by removed elements
+        final boolean anyToRemove = removeCount > 0;
+        if (anyToRemove) {
+            final int newSize = size - removeCount;
+            for (int i = 0, j = 0; (i < size) && (j < newSize); i++, j++) {
+                i = removeSet.nextClearBit(i);
+                elementData[j] = elementData[i];
+            }
+            for (int k = newSize; k < size; k++) {
+                elementData[k] = null;  // Let gc do its work
+            }
+            elementCount = newSize;
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+            }
+            modCount++;
+        }
+
+        return anyToRemove;
+    }
+
+    //遍历元素，替换元素为operator的返回值
+    @Override
+    @SuppressWarnings("unchecked")
+    public synchronized void replaceAll(UnaryOperator<E> operator) {
+        Objects.requireNonNull(operator);
+        final int expectedModCount = modCount;
+        final int size = elementCount;
+        for (int i = 0; modCount == expectedModCount && i < size; i++) {
+            elementData[i] = operator.apply((E) elementData[i]);
+        }
+        if (modCount != expectedModCount) {
+            throw new ConcurrentModificationException();
+        }
+        modCount++;
+    }
+
+    // 排序
+    @SuppressWarnings("unchecked")
+    @Override
+    public synchronized void sort(Comparator<? super E> c) {
+        final int expectedModCount = modCount;
+        Arrays.sort((E[]) elementData, 0, elementCount, c);
+        if (modCount != expectedModCount) {
+            throw new ConcurrentModificationException();
+        }
+        modCount++;
+    }
+
+    /**
+     * Creates a <em><a href="Spliterator.html#binding">late-binding</a></em>
+     * and <em>fail-fast</em> {@link Spliterator} over the elements in this
+     * list.
+     *
+     * <p>The {@code Spliterator} reports {@link Spliterator#SIZED},
+     * {@link Spliterator#SUBSIZED}, and {@link Spliterator#ORDERED}.
+     * Overriding implementations should document the reporting of additional
+     * characteristic values.
+     *
+     * @return a {@code Spliterator} over the elements in this list
+     * @since 1.8
+     */
+    // 返回分流器
+    @Override
+    public Spliterator<E> spliterator() {
+        return new VectorSpliterator<>(this, null, 0, -1, 0);
+    }
+
+    /**
+     * Similar to ArrayList Spliterator
+     */
+    static final class VectorSpliterator<E> implements Spliterator<E> {
+        private final Vector<E> list;
+        private Object[] array;
+        private int index; // current index, modified on advance/split
+        private int fence; // -1 until used; then one past last index
+        private int expectedModCount; // initialized when fence set
+
+        /**
+         * Create new spliterator covering the given  range
+         */
+        VectorSpliterator(Vector<E> list, Object[] array, int origin, int fence,
+                          int expectedModCount) {
+            this.list = list;
+            this.array = array;
+            this.index = origin;
+            this.fence = fence;
+            this.expectedModCount = expectedModCount;
+        }
+
+        private int getFence() { // initialize on first use
+            int hi;
+            if ((hi = fence) < 0) {
+                synchronized (list) {
+                    array = list.elementData;
+                    expectedModCount = list.modCount;
+                    hi = fence = list.elementCount;
+                }
+            }
+            return hi;
+        }
+
+        public Spliterator<E> trySplit() {
+            int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
+            return (lo >= mid) ? null :
+                    new VectorSpliterator<E>(list, array, lo, index = mid,
+                            expectedModCount);
+        }
+
+        @SuppressWarnings("unchecked")
+        public boolean tryAdvance(Consumer<? super E> action) {
+            int i;
+            if (action == null)
+                throw new NullPointerException();
+            if (getFence() > (i = index)) {
+                index = i + 1;
+                action.accept((E) array[i]);
+                if (list.modCount != expectedModCount)
+                    throw new ConcurrentModificationException();
+                return true;
+            }
+            return false;
+        }
+
+        @SuppressWarnings("unchecked")
+        public void forEachRemaining(Consumer<? super E> action) {
+            int i, hi; // hoist accesses and checks from loop
+            Vector<E> lst;
+            Object[] a;
+            if (action == null)
+                throw new NullPointerException();
+            if ((lst = list) != null) {
+                if ((hi = fence) < 0) {
+                    synchronized (lst) {
+                        expectedModCount = lst.modCount;
+                        a = array = lst.elementData;
+                        hi = fence = lst.elementCount;
+                    }
+                } else
+                    a = array;
+                if (a != null && (i = index) >= 0 && (index = hi) <= a.length) {
+                    while (i < hi)
+                        action.accept((E) a[i++]);
+                    if (lst.modCount == expectedModCount)
+                        return;
+                }
+            }
+            throw new ConcurrentModificationException();
+        }
+
+        public long estimateSize() {
+            return (long) (getFence() - index);
+        }
+
+        public int characteristics() {
+            return Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED;
+        }
     }
 
     /**
@@ -1190,8 +1449,7 @@ public class Vector<E>
                 if (i >= size) {
                     return;
                 }
-        @SuppressWarnings("unchecked")
-                final E[] elementData = (E[]) Vector.this.elementData;
+                @SuppressWarnings("unchecked") final E[] elementData = (E[]) Vector.this.elementData;
                 if (i >= elementData.length) {
                     throw new ConcurrentModificationException();
                 }
@@ -1261,196 +1519,6 @@ public class Vector<E>
             }
             cursor = i + 1;
             lastRet = -1;
-        }
-    }
-
-    @Override
-    public synchronized void forEach(Consumer<? super E> action) {
-        Objects.requireNonNull(action);
-        final int expectedModCount = modCount;
-        @SuppressWarnings("unchecked")
-        final E[] elementData = (E[]) this.elementData;
-        final int elementCount = this.elementCount;
-        for (int i=0; modCount == expectedModCount && i < elementCount; i++) {
-            action.accept(elementData[i]);
-        }
-        if (modCount != expectedModCount) {
-            throw new ConcurrentModificationException();
-        }
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public synchronized boolean removeIf(Predicate<? super E> filter) {
-        Objects.requireNonNull(filter);
-        // figure out which elements are to be removed
-        // any exception thrown from the filter predicate at this stage
-        // will leave the collection unmodified
-        int removeCount = 0;
-        final int size = elementCount;
-        final BitSet removeSet = new BitSet(size);
-        final int expectedModCount = modCount;
-        for (int i=0; modCount == expectedModCount && i < size; i++) {
-            @SuppressWarnings("unchecked")
-            final E element = (E) elementData[i];
-            if (filter.test(element)) {
-                removeSet.set(i);
-                removeCount++;
-            }
-        }
-        if (modCount != expectedModCount) {
-            throw new ConcurrentModificationException();
-        }
-
-        // shift surviving elements left over the spaces left by removed elements
-        final boolean anyToRemove = removeCount > 0;
-        if (anyToRemove) {
-            final int newSize = size - removeCount;
-            for (int i=0, j=0; (i < size) && (j < newSize); i++, j++) {
-                i = removeSet.nextClearBit(i);
-                elementData[j] = elementData[i];
-            }
-            for (int k=newSize; k < size; k++) {
-                elementData[k] = null;  // Let gc do its work
-            }
-            elementCount = newSize;
-            if (modCount != expectedModCount) {
-                throw new ConcurrentModificationException();
-            }
-            modCount++;
-        }
-
-        return anyToRemove;
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public synchronized void replaceAll(UnaryOperator<E> operator) {
-        Objects.requireNonNull(operator);
-        final int expectedModCount = modCount;
-        final int size = elementCount;
-        for (int i=0; modCount == expectedModCount && i < size; i++) {
-            elementData[i] = operator.apply((E) elementData[i]);
-        }
-        if (modCount != expectedModCount) {
-            throw new ConcurrentModificationException();
-        }
-        modCount++;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public synchronized void sort(Comparator<? super E> c) {
-        final int expectedModCount = modCount;
-        Arrays.sort((E[]) elementData, 0, elementCount, c);
-        if (modCount != expectedModCount) {
-            throw new ConcurrentModificationException();
-        }
-        modCount++;
-    }
-
-    /**
-     * Creates a <em><a href="Spliterator.html#binding">late-binding</a></em>
-     * and <em>fail-fast</em> {@link Spliterator} over the elements in this
-     * list.
-     *
-     * <p>The {@code Spliterator} reports {@link Spliterator#SIZED},
-     * {@link Spliterator#SUBSIZED}, and {@link Spliterator#ORDERED}.
-     * Overriding implementations should document the reporting of additional
-     * characteristic values.
-     *
-     * @return a {@code Spliterator} over the elements in this list
-     * @since 1.8
-     */
-    @Override
-    public Spliterator<E> spliterator() {
-        return new VectorSpliterator<>(this, null, 0, -1, 0);
-    }
-
-    /** Similar to ArrayList Spliterator */
-    static final class VectorSpliterator<E> implements Spliterator<E> {
-        private final Vector<E> list;
-        private Object[] array;
-        private int index; // current index, modified on advance/split
-        private int fence; // -1 until used; then one past last index
-        private int expectedModCount; // initialized when fence set
-
-        /** Create new spliterator covering the given  range */
-        VectorSpliterator(Vector<E> list, Object[] array, int origin, int fence,
-                          int expectedModCount) {
-            this.list = list;
-            this.array = array;
-            this.index = origin;
-            this.fence = fence;
-            this.expectedModCount = expectedModCount;
-        }
-
-        private int getFence() { // initialize on first use
-            int hi;
-            if ((hi = fence) < 0) {
-                synchronized(list) {
-                    array = list.elementData;
-                    expectedModCount = list.modCount;
-                    hi = fence = list.elementCount;
-                }
-            }
-            return hi;
-        }
-
-        public Spliterator<E> trySplit() {
-            int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
-            return (lo >= mid) ? null :
-                new VectorSpliterator<E>(list, array, lo, index = mid,
-                                         expectedModCount);
-        }
-
-        @SuppressWarnings("unchecked")
-        public boolean tryAdvance(Consumer<? super E> action) {
-            int i;
-            if (action == null)
-                throw new NullPointerException();
-            if (getFence() > (i = index)) {
-                index = i + 1;
-                action.accept((E)array[i]);
-                if (list.modCount != expectedModCount)
-                    throw new ConcurrentModificationException();
-                return true;
-            }
-            return false;
-        }
-
-        @SuppressWarnings("unchecked")
-        public void forEachRemaining(Consumer<? super E> action) {
-            int i, hi; // hoist accesses and checks from loop
-            Vector<E> lst; Object[] a;
-            if (action == null)
-                throw new NullPointerException();
-            if ((lst = list) != null) {
-                if ((hi = fence) < 0) {
-                    synchronized(lst) {
-                        expectedModCount = lst.modCount;
-                        a = array = lst.elementData;
-                        hi = fence = lst.elementCount;
-                    }
-                }
-                else
-                    a = array;
-                if (a != null && (i = index) >= 0 && (index = hi) <= a.length) {
-                    while (i < hi)
-                        action.accept((E) a[i++]);
-                    if (lst.modCount == expectedModCount)
-                        return;
-                }
-            }
-            throw new ConcurrentModificationException();
-        }
-
-        public long estimateSize() {
-            return (long) (getFence() - index);
-        }
-
-        public int characteristics() {
-            return Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED;
         }
     }
 }
