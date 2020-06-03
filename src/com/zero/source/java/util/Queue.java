@@ -141,6 +141,7 @@ package java.util;
  * @author Doug Lea
  * @param <E> the type of elements held in this collection
  */
+// 先进先出的队列 接口
 public interface Queue<E> extends Collection<E> {
     /**
      * Inserts the specified element into this queue if it is possible to do so
@@ -159,6 +160,7 @@ public interface Queue<E> extends Collection<E> {
      * @throws IllegalArgumentException if some property of this element
      *         prevents it from being added to this queue
      */
+    // 添加指定的元素到队列中，当容量不足时，抛出IllegalStateException
     boolean add(E e);
 
     /**
@@ -178,6 +180,7 @@ public interface Queue<E> extends Collection<E> {
      * @throws IllegalArgumentException if some property of this element
      *         prevents it from being added to this queue
      */
+    // 入队，无法入队时扩容或返回false，不阻塞
     boolean offer(E e);
 
     /**
@@ -188,6 +191,7 @@ public interface Queue<E> extends Collection<E> {
      * @return the head of this queue
      * @throws NoSuchElementException if this queue is empty
      */
+    // 移除队列头部的节点，并返回该元素，无法出队时抛异常，不阻塞
     E remove();
 
     /**
@@ -196,6 +200,7 @@ public interface Queue<E> extends Collection<E> {
      *
      * @return the head of this queue, or {@code null} if this queue is empty
      */
+    // 移除队列头部的节点，并返回该元素，无法出队时返回null，不阻塞
     E poll();
 
     /**
@@ -206,6 +211,7 @@ public interface Queue<E> extends Collection<E> {
      * @return the head of this queue
      * @throws NoSuchElementException if this queue is empty
      */
+    // 查看队列头部的元素，如果队列为空，抛出异常
     E element();
 
     /**
@@ -214,5 +220,6 @@ public interface Queue<E> extends Collection<E> {
      *
      * @return the head of this queue, or {@code null} if this queue is empty
      */
+    // // 查看队列头部的元素，如果队列为空，返回null
     E peek();
 }
