@@ -81,7 +81,7 @@ package java.util;
  * containing all of the strings in <tt>s</tt> from <tt>low</tt> to
  * <tt>high</tt>, inclusive:<pre>
  *   SortedSet&lt;String&gt; sub = s.subSet(low, high+"\0");</pre>
- *
+ * <p>
  * A similar technique can be used to generate an <i>open range</i> (which
  * contains neither endpoint).  The following idiom obtains a view
  * containing all of the Strings in <tt>s</tt> from <tt>low</tt> to
@@ -93,8 +93,7 @@ package java.util;
  * Java Collections Framework</a>.
  *
  * @param <E> the type of elements maintained by this set
- *
- * @author  Josh Bloch
+ * @author Josh Bloch
  * @see Set
  * @see TreeSet
  * @see SortedMap
@@ -105,6 +104,7 @@ package java.util;
  * @since 1.2
  */
 
+// 有序的Set接口
 public interface SortedSet<E> extends Set<E> {
     /**
      * Returns the comparator used to order the elements in this set,
@@ -112,9 +112,10 @@ public interface SortedSet<E> extends Set<E> {
      * natural ordering} of its elements.
      *
      * @return the comparator used to order the elements in this set,
-     *         or <tt>null</tt> if this set uses the natural ordering
-     *         of its elements
+     * or <tt>null</tt> if this set uses the natural ordering
+     * of its elements
      */
+    // 返回比较器
     Comparator<? super E> comparator();
 
     /**
@@ -130,23 +131,23 @@ public interface SortedSet<E> extends Set<E> {
      * on an attempt to insert an element outside its range.
      *
      * @param fromElement low endpoint (inclusive) of the returned set
-     * @param toElement high endpoint (exclusive) of the returned set
+     * @param toElement   high endpoint (exclusive) of the returned set
      * @return a view of the portion of this set whose elements range from
-     *         <tt>fromElement</tt>, inclusive, to <tt>toElement</tt>, exclusive
-     * @throws ClassCastException if <tt>fromElement</tt> and
-     *         <tt>toElement</tt> cannot be compared to one another using this
-     *         set's comparator (or, if the set has no comparator, using
-     *         natural ordering).  Implementations may, but are not required
-     *         to, throw this exception if <tt>fromElement</tt> or
-     *         <tt>toElement</tt> cannot be compared to elements currently in
-     *         the set.
-     * @throws NullPointerException if <tt>fromElement</tt> or
-     *         <tt>toElement</tt> is null and this set does not permit null
-     *         elements
+     * <tt>fromElement</tt>, inclusive, to <tt>toElement</tt>, exclusive
+     * @throws ClassCastException       if <tt>fromElement</tt> and
+     *                                  <tt>toElement</tt> cannot be compared to one another using this
+     *                                  set's comparator (or, if the set has no comparator, using
+     *                                  natural ordering).  Implementations may, but are not required
+     *                                  to, throw this exception if <tt>fromElement</tt> or
+     *                                  <tt>toElement</tt> cannot be compared to elements currently in
+     *                                  the set.
+     * @throws NullPointerException     if <tt>fromElement</tt> or
+     *                                  <tt>toElement</tt> is null and this set does not permit null
+     *                                  elements
      * @throws IllegalArgumentException if <tt>fromElement</tt> is
-     *         greater than <tt>toElement</tt>; or if this set itself
-     *         has a restricted range, and <tt>fromElement</tt> or
-     *         <tt>toElement</tt> lies outside the bounds of the range
+     *                                  greater than <tt>toElement</tt>; or if this set itself
+     *                                  has a restricted range, and <tt>fromElement</tt> or
+     *                                  <tt>toElement</tt> lies outside the bounds of the range
      */
     SortedSet<E> subSet(E fromElement, E toElement);
 
@@ -162,18 +163,18 @@ public interface SortedSet<E> extends Set<E> {
      *
      * @param toElement high endpoint (exclusive) of the returned set
      * @return a view of the portion of this set whose elements are strictly
-     *         less than <tt>toElement</tt>
-     * @throws ClassCastException if <tt>toElement</tt> is not compatible
-     *         with this set's comparator (or, if the set has no comparator,
-     *         if <tt>toElement</tt> does not implement {@link Comparable}).
-     *         Implementations may, but are not required to, throw this
-     *         exception if <tt>toElement</tt> cannot be compared to elements
-     *         currently in the set.
-     * @throws NullPointerException if <tt>toElement</tt> is null and
-     *         this set does not permit null elements
+     * less than <tt>toElement</tt>
+     * @throws ClassCastException       if <tt>toElement</tt> is not compatible
+     *                                  with this set's comparator (or, if the set has no comparator,
+     *                                  if <tt>toElement</tt> does not implement {@link Comparable}).
+     *                                  Implementations may, but are not required to, throw this
+     *                                  exception if <tt>toElement</tt> cannot be compared to elements
+     *                                  currently in the set.
+     * @throws NullPointerException     if <tt>toElement</tt> is null and
+     *                                  this set does not permit null elements
      * @throws IllegalArgumentException if this set itself has a
-     *         restricted range, and <tt>toElement</tt> lies outside the
-     *         bounds of the range
+     *                                  restricted range, and <tt>toElement</tt> lies outside the
+     *                                  bounds of the range
      */
     SortedSet<E> headSet(E toElement);
 
@@ -189,18 +190,18 @@ public interface SortedSet<E> extends Set<E> {
      *
      * @param fromElement low endpoint (inclusive) of the returned set
      * @return a view of the portion of this set whose elements are greater
-     *         than or equal to <tt>fromElement</tt>
-     * @throws ClassCastException if <tt>fromElement</tt> is not compatible
-     *         with this set's comparator (or, if the set has no comparator,
-     *         if <tt>fromElement</tt> does not implement {@link Comparable}).
-     *         Implementations may, but are not required to, throw this
-     *         exception if <tt>fromElement</tt> cannot be compared to elements
-     *         currently in the set.
-     * @throws NullPointerException if <tt>fromElement</tt> is null
-     *         and this set does not permit null elements
+     * than or equal to <tt>fromElement</tt>
+     * @throws ClassCastException       if <tt>fromElement</tt> is not compatible
+     *                                  with this set's comparator (or, if the set has no comparator,
+     *                                  if <tt>fromElement</tt> does not implement {@link Comparable}).
+     *                                  Implementations may, but are not required to, throw this
+     *                                  exception if <tt>fromElement</tt> cannot be compared to elements
+     *                                  currently in the set.
+     * @throws NullPointerException     if <tt>fromElement</tt> is null
+     *                                  and this set does not permit null elements
      * @throws IllegalArgumentException if this set itself has a
-     *         restricted range, and <tt>fromElement</tt> lies outside the
-     *         bounds of the range
+     *                                  restricted range, and <tt>fromElement</tt> lies outside the
+     *                                  bounds of the range
      */
     SortedSet<E> tailSet(E fromElement);
 
@@ -234,8 +235,8 @@ public interface SortedSet<E> extends Set<E> {
      * Otherwise, the spliterator's comparator must be the same as or impose the
      * same total ordering as the sorted set's comparator.
      *
-     * @implSpec
-     * The default implementation creates a
+     * @return a {@code Spliterator} over the elements in this sorted set
+     * @implSpec The default implementation creates a
      * <em><a href="Spliterator.html#binding">late-binding</a></em> spliterator
      * from the sorted set's {@code Iterator}.  The spliterator inherits the
      * <em>fail-fast</em> properties of the set's iterator.  The
@@ -243,12 +244,8 @@ public interface SortedSet<E> extends Set<E> {
      * <p>
      * The created {@code Spliterator} additionally reports
      * {@link Spliterator#SIZED}.
-     *
-     * @implNote
-     * The created {@code Spliterator} additionally reports
+     * @implNote The created {@code Spliterator} additionally reports
      * {@link Spliterator#SUBSIZED}.
-     *
-     * @return a {@code Spliterator} over the elements in this sorted set
      * @since 1.8
      */
     @Override
