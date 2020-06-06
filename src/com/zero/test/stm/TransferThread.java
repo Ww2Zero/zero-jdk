@@ -23,16 +23,11 @@ public class TransferThread extends Thread {
     }
 
     public void transfer(Account from, Account to, Integer balance) {
-        while (true) {
-            if (0 >= (Integer) from.getBalance()) {
-                return;
-            }
-            if (0 >= ((Integer) from.getBalance() - balance)) {
-                return;
-            }
+        boolean transfer = true;
+        while (transfer) {
             int i = time.incrementAndGet();
             System.out.printf("thread-[%s]-第%d转账[%s-->%s]=[%d]RMB%n", Thread.currentThread().getName(), i, from.getName(), to.getName(), balance);
-            from.transfer(to, balance);
+            transfer = from.transfer(to, balance);
             System.out.printf("thread-[%s][%d]-%s%n", Thread.currentThread().getName(), i, from.toString());
             System.out.printf("thread-[%s][%d]-%s%n", Thread.currentThread().getName(), i, to.toString());
 

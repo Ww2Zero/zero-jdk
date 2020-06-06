@@ -10,17 +10,23 @@ public class STM {
     }
 
     //原⼦化提交⽅法
-    public static void atomic(TxnRunnable action) {
+    public static boolean atomic(TxnRunnable action) {
         boolean committed = false;
         //如果没有提交成功，则⼀直重试
         while (!committed) {
             //创建新的事务
             STMTxn txn = new STMTxn();
             //执⾏业务逻辑
-            action.run(txn);
-            //提交事务
-            committed = txn.commit();
+            boolean run = action.run(txn);
+            if (run) {
+                //提交事务
+                committed = txn.commit();
+            } else {
+                return false;
+            }
+
         }
+        return true;
     }
 }
 
