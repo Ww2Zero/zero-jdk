@@ -1,5 +1,7 @@
 package com.zero.test.stm;
 
+import java.util.Objects;
+
 public class TxnRef<T> {
     //当前数据，带版本号
     volatile VersionedRef curRef;
@@ -21,5 +23,18 @@ public class TxnRef<T> {
 
     public Object getValue() {
         return curRef.value;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TxnRef<?> txnRef = (TxnRef<?>) o;
+        return Objects.equals(curRef, txnRef.curRef);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(curRef);
     }
 }
