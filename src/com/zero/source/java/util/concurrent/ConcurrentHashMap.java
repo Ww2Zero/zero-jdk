@@ -490,12 +490,14 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * tree removal about conversion back to plain bins upon
      * shrinkage.
      */
+    // 某个哈希槽（链）上的元素数量增加到此值后，这些元素进入波动期，即将从链表转换为红黑树
     static final int TREEIFY_THRESHOLD = 8;
     /**
      * The bin count threshold for untreeifying a (split) bin during a
      * resize operation. Should be less than TREEIFY_THRESHOLD, and at
      * most 6 to mesh with shrinkage detection under removal.
      */
+    // 哈希槽（链）上的红黑树上的元素数量减少到此值时，将红黑树转换为链表
     static final int UNTREEIFY_THRESHOLD = 6;
     /**
      * The smallest table capacity for which bins may be treeified.
@@ -508,9 +510,9 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     /*
      * Encodings for Node hash fields. See above for explanation.
      */
-    static final int MOVED = -1; // hash for forwarding nodes
-    static final int TREEBIN = -2; // hash for roots of trees
-    static final int RESERVED = -3; // hash for transient reservations
+    static final int MOVED = -1; // hash for forwarding nodes  // 前向结点
+    static final int TREEBIN = -2; // hash for roots of trees  // 红黑树节点
+    static final int RESERVED = -3; // hash for transient reservations  // 占位结点
     static final int HASH_BITS = 0x7fffffff; // usable bits of normal node hash
     /**
      * Number of CPUS, to place bounds on some sizings
@@ -524,6 +526,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * because the top two bits of 32bit hash fields are used for
      * control purposes.
      */
+    // 哈希数组最大容量
     private static final int MAXIMUM_CAPACITY = 1 << 30;
     /**
      * The default initial table capacity.  Must be a power of 2
@@ -535,6 +538,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * The default concurrency level for this table. Unused but
      * defined for compatibility with previous versions of this class.
      */
+    // 默认的并发级别
     private static final int DEFAULT_CONCURRENCY_LEVEL = 16;
     /**
      * The load factor for this table. Overrides of this value in
@@ -543,6 +547,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * simpler to use expressions such as {@code n - (n >>> 2)} for
      * the associated resizing threshold.
      */
+    // 加载因子
     private static final float LOAD_FACTOR = 0.75f;
     /**
      * Minimum number of rebinnings per transfer step. Ranges are
@@ -638,10 +643,12 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * The array of bins. Lazily initialized upon first insertion.
      * Size is always a power of two. Accessed directly by iterators.
      */
+    // 哈希数组（注：哈希数组的容量跟ConcurrentHashMap可以存储的元素数量不是一回事）
     transient volatile Node<K, V>[] table;
     /**
      * The next table to use; non-null only while resizing.
      */
+    // 哈希数组扩容时使用的新数组
     private transient volatile Node<K, V>[] nextTable;
     /**
      * Base counter value, used mainly when there is no contention,
@@ -661,7 +668,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     // 若为负数，则表示哈希数组正在初始化或正在扩容
     // -1表示正在初始化，其他负数表示-(1+正在扩容的线程数)
     // 当哈希数组为null，用于保留创建时初始化的数组大小，默认值为0
-    // 当初始化完成之后，保存数组的大小
+    // 当初始化完成之后，保存数组的大小,通常是0.75*容量
     private transient volatile int sizeCtl;
     /**
      * The next table index (plus one) to split while resizing.
@@ -674,6 +681,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     /**
      * Table of counter cells. When non-null, size is a power of 2.
      */
+    // 用于计算map的size的计算单元，记录每个哈希数组索引对应的元素个数
     private transient volatile CounterCell[] counterCells;
     // views
     private transient KeySetView<K, V> keySet;
@@ -784,6 +792,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * to incorporate impact of the highest bits that would otherwise
      * never be used in index calculations because of table bounds.
      */
+    // 计算哈希值的算法
     static final int spread(int h) {
         return (h ^ (h >>> 16)) & HASH_BITS;
     }
@@ -792,6 +801,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * Returns a power of two table size for the given desired capacity.
      * See Hackers Delight, sec 3.2
      */
+    // 返回给定值的最接近的2的整数幂
     private static final int tableSizeFor(int c) {
         int n = c - 1;
         n |= n >>> 1;
@@ -869,6 +879,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @return the new set
      * @since 1.8
      */
+    // 返回keySet的视图
     public static <K> KeySetView<K, Boolean> newKeySet() {
         return new KeySetView<K, Boolean>
                 (new ConcurrentHashMap<K, Boolean>(), Boolean.TRUE);
@@ -886,6 +897,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *                                  elements is negative
      * @since 1.8
      */
+    // 返回指定容量的keySet视图
     public static <K> KeySetView<K, Boolean> newKeySet(int initialCapacity) {
         return new KeySetView<K, Boolean>
                 (new ConcurrentHashMap<K, Boolean>(initialCapacity), Boolean.TRUE);
@@ -918,6 +930,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     /**
      * {@inheritDoc}
      */
+    // 返回map的键值对的个数
     public int size() {
         long n = sumCount();
         return ((n < 0L) ? 0 :
@@ -943,24 +956,38 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @throws NullPointerException if the specified key is null
      */
+    // 获取指定key对应的value，当key为null是抛出NullPointerException
     public V get(Object key) {
         Node<K, V>[] tab;
         Node<K, V> e, p;
         int n, eh;
         K ek;
         int h = spread(key.hashCode());
+        // 若哈希数组中指定位置的节点不为空
         if ((tab = table) != null && (n = tab.length) > 0 &&
                 (e = tabAt(tab, (n - 1) & h)) != null) {
-            if ((eh = e.hash) == h) {
-                if ((ek = e.key) == key || (ek != null && key.equals(ek)))
+            // 获取指定节点的hash值
+            eh = e.hash;
+            // 若获取节点和key的hash相等，则使用equals判断值是否相等
+            if (eh == h) {
+                // 若是同位数的值和key的值也相等，则返回该key对应的value值
+                if ((ek = e.key) == key || (ek != null && key.equals(ek))) {
                     return e.val;
-            } else if (eh < 0)
-                return (p = e.find(h, key)) != null ? p.val : null;
-            while ((e = e.next) != null) {
-                if (e.hash == h &&
-                        ((ek = e.key) == key || (ek != null && key.equals(ek))))
-                    return e.val;
+                }
             }
+            // 若指定节点的hash小于0
+            else if (eh < 0) {
+                return (p = e.find(h, key)) != null ? p.val : null;
+            }
+            // 若指定节点的hash大于0
+            else {
+                while ((e = e.next) != null) {
+                    if (e.hash == h &&
+                            ((ek = e.key) == key || (ek != null && key.equals(ek))))
+                        return e.val;
+                }
+            }
+
         }
         return null;
     }
@@ -974,6 +1001,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * {@code equals} method; {@code false} otherwise
      * @throws NullPointerException if the specified key is null
      */
+    // 判断Map中是否存在指定key的元素
     public boolean containsKey(Object key) {
         return get(key) != null;
     }
@@ -988,6 +1016,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * specified value
      * @throws NullPointerException if the specified value is null
      */
+    //判断Map中是否存在指定value的元素
     public boolean containsValue(Object value) {
         if (value == null)
             throw new NullPointerException();
@@ -1016,7 +1045,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * {@code null} if there was no mapping for {@code key}
      * @throws NullPointerException if the specified key or value is null
      */
-    // 添加元素
+    // 将指定的元素（key-value）存入当前map，并返回旧值，允许覆盖
     public V put(K key, V value) {
         return putVal(key, value, false);
     }
@@ -1137,6 +1166,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @param m mappings to be stored in this map
      */
+    // 添加指定map中所有元素添加到本map中
     public void putAll(Map<? extends K, ? extends V> m) {
         tryPresize(m.size());
         for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
@@ -1154,6 +1184,10 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * {@code null} if there was no mapping for {@code key}
      * @throws NullPointerException if the specified key is null
      */
+    // 移除拥有指定key的元素，并返回刚刚移除的元素的值
+    // 移除指定key的值，[将指定key对应的value值设置为null，没有节点的删除，不需要进行红黑树的调整和链表的调整]
+    // 这也是为什么concurrentHashMap中key不可以为null的原因，
+    // 当null可以为null时，就无法判断该null是设置的null还是replaceNode导致该value为null
     public V remove(Object key) {
         return replaceNode(key, null, null);
     }
@@ -1163,67 +1197,115 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * Replaces node value with v, conditional upon match of cv if
      * non-null.  If resulting value is null, delete.
      */
-    final V replaceNode(Object key, V value, Object cv) {
+    /*
+     * 根据key查找同位元素，如果找不到，直接返回null
+     * 如果存在同位元素，则：
+     * 　　如果cv不为空，且不等于旧值，仍然返回null
+     * 　　如果cv为null，或者cv等于旧值，则：
+     * 　　　　如果newValue不为空，用新值覆盖旧值
+     * 　　　　如果newValue为null，移除旧值
+     */
+    final V replaceNode(Object key, V newValue, Object cv) {
+        // 计算key的hash值
         int hash = spread(key.hashCode());
+        // 遍历哈希数组
         for (Node<K, V>[] tab = table; ; ) {
+
             Node<K, V> f;
             int n, i, fh;
+            //若哈希数组为空或元素数量为0或对应的hash节点为null，则退出循环
             if (tab == null || (n = tab.length) == 0 ||
-                    (f = tabAt(tab, i = (n - 1) & hash)) == null)
+                    (f = tabAt(tab, i = (n - 1) & hash)) == null) {
                 break;
-            else if ((fh = f.hash) == MOVED)
+            }
+            // 若该节点正在移动中，则加速扩容过程
+            else if ((fh = f.hash) == MOVED) {
                 tab = helpTransfer(tab, f);
-            else {
+            } else {
                 V oldVal = null;
+                // 是否处理过结点
                 boolean validated = false;
+                // 锁定节点f
                 synchronized (f) {
+                    // 双重检查
                     if (tabAt(tab, i) == f) {
+                        // 处理普通结点
                         if (fh >= 0) {
                             validated = true;
-                            for (Node<K, V> e = f, pred = null; ; ) {
+                            // 初始化为哈希槽上首个结点
+                            Node<K, V> e = f;
+
+                            Node<K, V> pred = null;
+                            // 开始遍历
+                            for (; ; ) {
                                 K ek;
+                                // 找到同位数，并且值相等，
                                 if (e.hash == hash &&
                                         ((ek = e.key) == key ||
                                                 (ek != null && key.equals(ek)))) {
+                                    // 记录旧值
                                     V ev = e.val;
+                                    // 若cv为null或cv==ev或cv.equals(ev)
                                     if (cv == null || cv == ev ||
                                             (ev != null && cv.equals(ev))) {
+                                        // 将旧值设置为ev
                                         oldVal = ev;
-                                        if (value != null)
-                                            e.val = value;
-                                        else if (pred != null)
-                                            pred.next = e.next;
-                                        else
-                                            setTabAt(tab, i, e.next);
+                                        // 若newValue不为null，则将key对应值修改为newValue
+                                        if (newValue != null) {
+                                            e.val = newValue;
+                                        }
+                                        // 如果newValue为null，需要进一步判断
+                                        else {
+                                            // 如果pred为null，说明需要移除哈希槽上首个结点
+                                            if (pred == null) {
+                                                // 设置tab[i]为e.next
+                                                setTabAt(tab, i, e.next);
+                                            } else {
+                                                // 移除旧结点
+                                                pred.next = e.next;
+                                            }
+                                        }
                                     }
                                     break;
                                 }
                                 pred = e;
+                                // for向后移动
                                 if ((e = e.next) == null)
                                     break;
                             }
-                        } else if (f instanceof TreeBin) {
+                        }
+                        // 若节点为红黑树的首节点
+                        else if (f instanceof TreeBin) {
                             validated = true;
                             TreeBin<K, V> t = (TreeBin<K, V>) f;
                             TreeNode<K, V> r, p;
+                            // 找到同位数
                             if ((r = t.root) != null &&
                                     (p = r.findTreeNode(hash, key, null)) != null) {
+                                // 记录旧值
                                 V pv = p.val;
+                                // 若cv为null或cv==ev或cv.equals(ev)
                                 if (cv == null || cv == pv ||
                                         (pv != null && cv.equals(pv))) {
+                                    // 将旧值设置为ev
                                     oldVal = pv;
-                                    if (value != null)
-                                        p.val = value;
-                                    else if (t.removeTreeNode(p))
-                                        setTabAt(tab, i, untreeify(t.first));
+                                    // 若newValue不为null，则将key对应值修改为newValue
+                                    if (newValue != null) {
+                                        p.val = newValue;
+                                    } else if (t.removeTreeNode(p)) {
+                                        Node<K, V> x = untreeify(t.first);
+                                        // 设置tab[i]为x
+                                        setTabAt(tab, i, x);
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                // 若处理过节点，进一步验证
                 if (validated) {
                     if (oldVal != null) {
-                        if (value == null)
+                        if (newValue == null)
                             addCount(-1L, -1);
                         return oldVal;
                     }
@@ -1237,15 +1319,19 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     /**
      * Removes all of the mappings from this map.
      */
+    // 移除所有节点
     public void clear() {
         long delta = 0L; // negative number of deletions
         int i = 0;
         Node<K, V>[] tab = table;
+        // 从哈希数组的0开始遍历
         while (tab != null && i < tab.length) {
             int fh;
             Node<K, V> f = tabAt(tab, i);
-            if (f == null)
+            //  节点为null，向下移动
+            if (f == null){
                 ++i;
+            }
             else if ((fh = f.hash) == MOVED) {
                 tab = helpTransfer(tab, f);
                 i = 0; // restart
@@ -1259,6 +1345,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
                             --delta;
                             p = p.next;
                         }
+                        // 设置tab[i]为null
                         setTabAt(tab, i++, null);
                     }
                 }
@@ -1286,6 +1373,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @return the set view
      */
+    // 返回key的集合
     public KeySetView<K, V> keySet() {
         KeySetView<K, V> ks;
         return (ks = keySet) != null ? ks : (keySet = new KeySetView<K, V>(this, null));
@@ -1311,6 +1399,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @return the collection view
      */
+    // 返回value的集合
     public Collection<V> values() {
         ValuesView<K, V> vs;
         return (vs = values) != null ? vs : (values = new ValuesView<K, V>(this));
@@ -1333,6 +1422,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @return the set view
      */
+    // 返回键值对的集合
     public Set<Map.Entry<K, V>> entrySet() {
         EntrySetView<K, V> es;
         return (es = entrySet) != null ? es : (entrySet = new EntrySetView<K, V>(this));
@@ -1345,6 +1435,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @return the hash code value for this map
      */
+    // 返回哈希值
     public int hashCode() {
         int h = 0;
         Node<K, V>[] t;
@@ -1583,6 +1674,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * or {@code null} if there was no mapping for the key
      * @throws NullPointerException if the specified key or value is null
      */
+    // 将指定的元素（key-value）存入当前map，并返回旧值，不允许覆盖
     public V putIfAbsent(K key, V value) {
         return putVal(key, value, true);
     }
@@ -1592,6 +1684,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @throws NullPointerException if the specified key is null
      */
+    // 移除拥有指定key和value的元素，返回值表示是否移除成功
     public boolean remove(Object key, Object value) {
         if (key == null)
             throw new NullPointerException();
@@ -1603,6 +1696,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      *
      * @throws NullPointerException if any of the arguments are null
      */
+    // 替换指定key和value的元素的value为newValue
     public boolean replace(K key, V oldValue, V newValue) {
         if (key == null || oldValue == null || newValue == null)
             throw new NullPointerException();
@@ -1635,11 +1729,12 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @return the mapping for the key, if present; else the default value
      * @throws NullPointerException if the specified key is null
      */
+    // 获取指定key的对应的value值，否则返回默认值
     public V getOrDefault(Object key, V defaultValue) {
         V v;
         return (v = get(key)) == null ? defaultValue : v;
     }
-
+    // 遍历调用action方法
     public void forEach(BiConsumer<? super K, ? super V> action) {
         if (action == null) throw new NullPointerException();
         Node<K, V>[] t;
@@ -1650,7 +1745,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
             }
         }
     }
-
+    //  遍历调用function
     public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
         if (function == null) throw new NullPointerException();
         Node<K, V>[] t;
@@ -1694,6 +1789,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @throws RuntimeException      or Error if the mappingFunction does so,
      *                               in which case the mapping is left unestablished
      */
+    // 插入操作，返回新值（可能为null）
+    // 不存在同位元素时，使用key创造的新value来更新旧value。如果同位元素存在，则直接返回旧值。
     public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
         if (key == null || mappingFunction == null)
             throw new NullPointerException();
@@ -1795,6 +1892,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @throws RuntimeException      or Error if the remappingFunction does so,
      *                               in which case the mapping is unchanged
      */
+    // 删除/替换操作，返回新值（可能为null）
+    // 存在同位元素时，使用key和旧value创造的新value来更新旧value
     public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         if (key == null || remappingFunction == null)
             throw new NullPointerException();
@@ -1887,6 +1986,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @throws RuntimeException      or Error if the remappingFunction does so,
      *                               in which case the mapping is unchanged
      */
+    // 插入/删除/替换操作，返回新值（可能为null）
+    // 使用key和旧value创造的新value来更新旧value
     public V compute(K key,
                      BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         if (key == null || remappingFunction == null)
@@ -2011,6 +2112,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @throws RuntimeException     or Error if the remappingFunction does so,
      *                              in which case the mapping is unchanged
      */
+    // 插入/删除/替换操作，返回新值（可能为null）
+    // 使用备用value和旧value创造的新value来更新旧value
     public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
         if (key == null || value == null || remappingFunction == null)
             throw new NullPointerException();
@@ -2113,6 +2216,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * {@code false} otherwise
      * @throws NullPointerException if the specified value is null
      */
+    // 判断map中是否包含指定的value
     public boolean contains(Object value) {
         return containsValue(value);
     }
@@ -2123,6 +2227,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @return an enumeration of the keys in this table
      * @see #keySet()
      */
+    // 返回key的枚举集合
     public Enumeration<K> keys() {
         Node<K, V>[] t;
         int f = (t = table) == null ? 0 : t.length;
@@ -2135,6 +2240,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * @return an enumeration of the values in this table
      * @see #values()
      */
+    // 返回value的枚举集合
     public Enumeration<V> elements() {
         Node<K, V>[] t;
         int f = (t = table) == null ? 0 : t.length;
@@ -3430,6 +3536,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
         /**
          * Virtualized support for map.get(); overridden in subclasses.
          */
+        // 根据给定的key和hash（由key计算而来）查找对应的（同位）元素，如果找不到，则返回null
         Node<K, V> find(int h, Object k) {
             Node<K, V> e = this;
             if (k != null) {
@@ -3515,6 +3622,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
      * A padded cell for distributing counts.  Adapted from LongAdder
      * and Striped64.  See their internal docs for explanation.
      */
+    // 计算单元
     @sun.misc.Contended
     static final class CounterCell {
         volatile long value;
