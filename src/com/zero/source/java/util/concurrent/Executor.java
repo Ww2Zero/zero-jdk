@@ -125,6 +125,8 @@ package java.util.concurrent;
  * @since 1.5
  * @author Doug Lea
  */
+// Executor表示一个【任务执行器】
+// 该【任务执行器】有能力执行Runnable类型的任务
 public interface Executor {
 
     /**
@@ -137,5 +139,6 @@ public interface Executor {
      * accepted for execution
      * @throws NullPointerException if command is null
      */
+    // 执行command的任务
     void execute(Runnable command);
 }
