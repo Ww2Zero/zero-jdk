@@ -93,6 +93,12 @@ package java.util.concurrent;
  * @author Doug Lea
  * @param <V> The result type returned by this Future's {@code get} method
  */
+/*
+ * Future表示一类带有返回值的，可异步执行的任务
+ *
+ * 这类任务在执行中可被取消。
+ * 当任务执行完成之后，可通过get()获取返回值，必要时阻塞直到准备就绪。
+ */
 public interface Future<V> {
 
     /**
@@ -116,6 +122,7 @@ public interface Future<V> {
      * typically because it has already completed normally;
      * {@code true} otherwise
      */
+    // 中止异步任务，包括取消或中断，参数【mayInterruptIfRunning】表示是否可在任务执行期间中断线程
     boolean cancel(boolean mayInterruptIfRunning);
 
     /**
@@ -124,6 +131,7 @@ public interface Future<V> {
      *
      * @return {@code true} if this task was cancelled before it completed
      */
+    // 判断是否是否中断
     boolean isCancelled();
 
     /**
@@ -135,6 +143,7 @@ public interface Future<V> {
      *
      * @return {@code true} if this task completed
      */
+    // 判断任务是否完成
     boolean isDone();
 
     /**
@@ -148,6 +157,7 @@ public interface Future<V> {
      * @throws InterruptedException if the current thread was interrupted
      * while waiting
      */
+    // 获取任务计算结果，如果任务未完成，则陷入阻塞
     V get() throws InterruptedException, ExecutionException;
 
     /**
@@ -164,6 +174,7 @@ public interface Future<V> {
      * while waiting
      * @throws TimeoutException if the wait timed out
      */
+    // 在规定时间内获取任务计算结果，超时后还没获取到的话，会抛出超时异常
     V get(long timeout, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException;
 }
