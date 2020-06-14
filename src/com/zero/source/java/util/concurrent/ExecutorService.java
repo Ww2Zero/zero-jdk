@@ -134,6 +134,13 @@ import java.util.Collection;
  * @since 1.5
  * @author Doug Lea
  */
+/*
+ * ExecutorService表示一个【任务执行框架】
+ * 典型的实现类为【任务池】ForkJoinPool与【线程池】ThreadPoolExecutor
+ *
+ * 客户端向【任务执行框架】提交任务后，由【任务执行框架】调度、执行任务，
+ * 当任务结束后，可以选择让【任务执行框架】暂停/阻塞或停止。
+ */
 public interface ExecutorService extends Executor {
 
     /**
@@ -153,6 +160,7 @@ public interface ExecutorService extends Executor {
      *         or the security manager's {@code checkAccess} method
      *         denies access.
      */
+    //  有序关闭【任务执行框架】，正在执行的任务不受影响
     void shutdown();
 
     /**
@@ -178,6 +186,7 @@ public interface ExecutorService extends Executor {
      *         or the security manager's {@code checkAccess} method
      *         denies access.
      */
+    // 关闭所有执行中的【任务执行框架】，返回还未执行的任务列表
     List<Runnable> shutdownNow();
 
     /**
@@ -185,6 +194,7 @@ public interface ExecutorService extends Executor {
      *
      * @return {@code true} if this executor has been shut down
      */
+    // 返回执行器是否关闭
     boolean isShutdown();
 
     /**
@@ -194,6 +204,7 @@ public interface ExecutorService extends Executor {
      *
      * @return {@code true} if all tasks have completed following shut down
      */
+    // 若所有的任务都关闭则返回 true，否则返回false
     boolean isTerminated();
 
     /**
@@ -207,6 +218,7 @@ public interface ExecutorService extends Executor {
      *         {@code false} if the timeout elapsed before termination
      * @throws InterruptedException if interrupted while waiting
      */
+    // 等待【任务执行框架】终止后，返回true
     boolean awaitTermination(long timeout, TimeUnit unit)
         throws InterruptedException;
 
@@ -233,6 +245,7 @@ public interface ExecutorService extends Executor {
      *         scheduled for execution
      * @throws NullPointerException if the task is null
      */
+    // 提交一个有Callable的任务，返回一个Future
     <T> Future<T> submit(Callable<T> task);
 
     /**
@@ -248,6 +261,7 @@ public interface ExecutorService extends Executor {
      *         scheduled for execution
      * @throws NullPointerException if the task is null
      */
+    // 提交Runnable的任务，并返回结果
     <T> Future<T> submit(Runnable task, T result);
 
     /**
@@ -261,6 +275,7 @@ public interface ExecutorService extends Executor {
      *         scheduled for execution
      * @throws NullPointerException if the task is null
      */
+    //提交一个有Callable的任务，返回一个Future
     Future<?> submit(Runnable task);
 
     /**
@@ -284,6 +299,7 @@ public interface ExecutorService extends Executor {
      * @throws RejectedExecutionException if any task cannot be
      *         scheduled for execution
      */
+    // 执行指定容器中的所有任务，返回值是所有包装后的任务列表
     <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
         throws InterruptedException;
 
@@ -315,6 +331,7 @@ public interface ExecutorService extends Executor {
      * @throws RejectedExecutionException if any task cannot be scheduled
      *         for execution
      */
+    // 在指定时间内执行指定容器中的所有任务，返回值是所有包装后的任务列表（包括超时后被中止的任务）
     <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
                                   long timeout, TimeUnit unit)
         throws InterruptedException;
@@ -338,6 +355,7 @@ public interface ExecutorService extends Executor {
      * @throws RejectedExecutionException if tasks cannot be scheduled
      *         for execution
      */
+    // 从任一任务开始执行，只要发现某个任务已结束，就中断其他正在执行的任务，并返回首个被发现结束的任务的计算结果
     <T> T invokeAny(Collection<? extends Callable<T>> tasks)
         throws InterruptedException, ExecutionException;
 
@@ -364,6 +382,7 @@ public interface ExecutorService extends Executor {
      * @throws RejectedExecutionException if tasks cannot be scheduled
      *         for execution
      */
+    // 运作方式同invokeAny(Collection)，不过这里限制这些操作要在指定的时间内完成，否则就抛出异常
     <T> T invokeAny(Collection<? extends Callable<T>> tasks,
                     long timeout, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException;
