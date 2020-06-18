@@ -34,11 +34,13 @@
  */
 
 package java.util.concurrent.locks;
-import java.util.concurrent.TimeUnit;
+
+import sun.misc.Unsafe;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import sun.misc.Unsafe;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Provides a framework for implementing blocking locks and related
@@ -64,8 +66,8 @@ import sun.misc.Unsafe;
  * appropriate by concrete locks and related synchronizers to
  * implement their public methods.
  *
- * <p>This class supports either or both a default <em>exclusive</em>
- * mode and a <em>shared</em> mode. When acquired in exclusive mode,
+ * <p>This class supports either or both a default <em>exclusive（独占）</em>
+ * mode and a <em>shared（共享）</em> mode. When acquired in exclusive mode,
  * attempted acquires by other threads cannot succeed. Shared mode
  * acquires by multiple threads may (but need not) succeed. This class
  * does not &quot;understand&quot; these differences except in the
@@ -116,7 +118,7 @@ import sun.misc.Unsafe;
  * <li> {@link #tryReleaseShared}
  * <li> {@link #isHeldExclusively}
  * </ul>
- *
+ * <p>
  * Each of these methods by default throws {@link
  * UnsupportedOperationException}.  Implementations of these methods
  * must be internally thread-safe, and should in general be short and
@@ -145,7 +147,7 @@ import sun.misc.Unsafe;
  *     if (tryRelease(arg))
  *        <em>unblock the first queued thread</em>;
  * </pre>
- *
+ * <p>
  * (Shared mode is similar but may involve cascading signals.)
  *
  * <p id="barging">Because checks in acquire are invoked before
@@ -283,20 +285,1540 @@ import sun.misc.Unsafe;
  *   }
  * }}</pre>
  *
- * @since 1.5
  * @author Doug Lea
+ * @since 1.5
  */
-public abstract class AbstractQueuedSynchronizer
-    extends AbstractOwnableSynchronizer
-    implements java.io.Serializable {
+// 抽象的同步队列，是一个带头结点的双向链表，用于实现锁的语义
+public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchronizer implements java.io.Serializable {
+
+    /**
+     * The number of nanoseconds for which it is faster to spin
+     * rather than to use timed park. A rough estimate suffices
+     * to improve responsiveness with very short timeouts.
+     */
+    static final long spinForTimeoutThreshold = 1000L;
 
     private static final long serialVersionUID = 7373984972572414691L;
+    /**
+     * Setup to support compareAndSet. We need to natively implement
+     * this here: For the sake of permitting future enhancements, we
+     * cannot explicitly subclass AtomicInteger, which would be
+     * efficient and useful otherwise. So, as the lesser of evils, we
+     * natively implement using hotspot intrinsics API. And while we
+     * are at it, we do the same for other CASable fields (which could
+     * otherwise be done with atomic field updaters).
+     */
+    // 用来CAS 方式设置地址偏移量的值
+    private static final Unsafe unsafe = Unsafe.getUnsafe();
+    // 同步队列状态内存地址偏移量
+    private static final long stateOffset;
+    // 同步队列头节点内存地址偏移量
+    private static final long headOffset;
+    // 同步队列尾节点内存地址偏移量
+    private static final long tailOffset;
+    // 同步队列中节点等待状态内存地址偏移量
+    private static final long waitStatusOffset;
+    // 同步队列中节点下一节点内存地址偏移量
+    private static final long nextOffset;
+
+    static {
+        try {
+            stateOffset = unsafe.objectFieldOffset
+                    (AbstractQueuedSynchronizer.class.getDeclaredField("state"));
+            headOffset = unsafe.objectFieldOffset
+                    (AbstractQueuedSynchronizer.class.getDeclaredField("head"));
+            tailOffset = unsafe.objectFieldOffset
+                    (AbstractQueuedSynchronizer.class.getDeclaredField("tail"));
+            waitStatusOffset = unsafe.objectFieldOffset
+                    (Node.class.getDeclaredField("waitStatus"));
+            nextOffset = unsafe.objectFieldOffset
+                    (Node.class.getDeclaredField("next"));
+
+        } catch (Exception ex) {
+            throw new Error(ex);
+        }
+    }
+
+    // Queuing utilities
+
+    /**
+     * Head of the wait queue, lazily initialized.  Except for
+     * initialization, it is modified only via method setHead.  Note:
+     * If head exists, its waitStatus is guaranteed not to be
+     * CANCELLED.
+     */
+    // 【|同步队列|】的头结点
+    private transient volatile Node head;
+    /**
+     * Tail of the wait queue, lazily initialized.  Modified only via
+     * method enq to add new wait node.
+     */
+    //【|同步队列|】的尾节点
+    private transient volatile Node tail;
+    /**
+     * The synchronization state.
+     */
+    // 同步队列的状态
+    private volatile int state;
 
     /**
      * Creates a new {@code AbstractQueuedSynchronizer} instance
      * with initial synchronization state of zero.
      */
-    protected AbstractQueuedSynchronizer() { }
+    protected AbstractQueuedSynchronizer() {
+    }
+
+    /**
+     * Checks and updates status for a node that failed to acquire.
+     * Returns true if thread should block. This is the main signal
+     * control in all acquire loops.  Requires that pred == node.prev.
+     *
+     * @param pred node's predecessor holding status
+     * @param node the node
+     * @return {@code true} if thread should block
+     */
+    /*
+     * 抢锁失败时，尝试为node的前驱设置阻塞标记
+     *
+     * 每个结点的阻塞标记设置在其前驱上，原因是：
+     * 每个正在活动的结点都将成为头结点，当活动的结点（头结点）执行完之后，
+     * 需要根据自身上面的阻塞标记，以确定要不要唤醒后续的结点
+     */
+    private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
+        // 前置节点的状态
+        int ws = pred.waitStatus;
+        // 如果前置节点的状态为SIGNAL,则表示node需要进入阻塞状态
+        if (ws == Node.SIGNAL) {
+            /*
+             * This node has already set status asking a release
+             * to signal it, so it can safely park.
+             */
+            return true;
+        }
+        // 如果node前驱的状态被标记为取消，则顺着其前驱向前遍历，将紧邻的待取消结点连成一片
+        if (ws > 0) {
+            /*
+             * Predecessor was cancelled. Skip over predecessors and
+             * indicate retry.
+             */
+            do {
+                node.prev = pred = pred.prev;
+            } while (pred.waitStatus > 0);
+            pred.next = node;
+        } else {
+            /*
+             * waitStatus must be 0 or PROPAGATE.  Indicate that we
+             * need a signal, but don't park yet.  Caller will need to
+             * retry to make sure it cannot acquire before parking.
+             */
+            // 更新node前驱的状态为Node.SIGNAL，即使node陷入阻塞
+            compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
+        }
+        return false;
+    }
+
+    /**
+     * Convenience method to interrupt current thread.
+     */
+    // 设置当前线程的中断状态
+    static void selfInterrupt() {
+        Thread.currentThread().interrupt();
+    }
+
+    /**
+     * CAS waitStatus field of a node.
+     */
+    // CAS  修改节点的 waitStatus
+    private static final boolean compareAndSetWaitStatus(Node node, int expect, int update) {
+        return unsafe.compareAndSwapInt(node, waitStatusOffset,
+                expect, update);
+    }
+
+    // Utilities for various versions of acquire
+
+    /**
+     * CAS next field of a node.
+     */
+    // CAS修改节点下一节点
+    private static final boolean compareAndSetNext(Node node, Node expect, Node update) {
+        return unsafe.compareAndSwapObject(node, nextOffset, expect, update);
+    }
+
+    /**
+     * Returns the current value of synchronization state.
+     * This operation has memory semantics of a {@code volatile} read.
+     *
+     * @return current state value
+     */
+    // 获取节点许可证数量
+    protected final int getState() {
+        return state;
+    }
+
+    /**
+     * Sets the value of synchronization state.
+     * This operation has memory semantics of a {@code volatile} write.
+     *
+     * @param newState the new state value
+     */
+    // 设置许可证数量
+    protected final void setState(int newState) {
+        state = newState;
+    }
+
+    /**
+     * Atomically sets synchronization state to the given updated
+     * value if the current state value equals the expected value.
+     * This operation has memory semantics of a {@code volatile} read
+     * and write.
+     *
+     * @param expect the expected value
+     * @param update the new value
+     * @return {@code true} if successful. False return indicates that the actual
+     * value was not equal to the expected value.
+     */
+    // CAS 原子设置许可证的数量
+    protected final boolean compareAndSetState(int expect, int update) {
+        // See below for intrinsics setup to support this
+        return unsafe.compareAndSwapInt(this, stateOffset, expect, update);
+    }
+
+    /*
+     * Various flavors of acquire, varying in exclusive/shared and
+     * control modes.  Each is mostly the same, but annoyingly
+     * different.  Only a little bit of factoring is possible due to
+     * interactions of exception mechanics (including ensuring that we
+     * cancel if tryAcquire throws exception) and other control, at
+     * least not without hurting performance too much.
+     */
+
+    /**
+     * Inserts node into queue, initializing if necessary. See picture above.
+     *
+     * @param node the node to insert
+     * @return node's predecessor
+     */
+    // 使用尾插法将node添加到【|同步队列|】，并返回旧的队尾
+    private Node enq(final Node node) {
+        for (; ; ) {
+            Node t = tail;
+            // 队尾为null时，即head也是null，则需要设置head节点
+            if (t == null) { // Must initialize
+                // 【|同步队列|】不存在时，需要初始化一个头结点
+                if (compareAndSetHead(new Node())) {
+                    // 将tail赋值给head
+                    tail = head;
+                }
+            }
+            // 队尾不为null，则需要将node添加到tail后
+            else {
+                // 设置node的前驱为原始的队尾节点
+                node.prev = t;
+                // 更新队尾指向node
+                if (compareAndSetTail(t, node)) {
+                    // 设置原始的队尾节点的next为node，形成双向链表
+                    t.next = node;
+                    // 返回原始的队尾节点
+                    return t;
+                }
+            }
+        }
+    }
+
+    /**
+     * Creates and enqueues node for current thread and given mode.
+     *
+     * @param mode Node.EXCLUSIVE for exclusive, Node.SHARED for shared
+     * @return the new node
+     */
+    /*
+     * 向【|同步队列|】添加一个排队者(线程)
+     *
+     * mode有两种可能：
+     * 1.独占模式：Node.EXCLUSIVE
+     * 2.共享模式：Node.SHARED
+     * 由此，可创建[独占模式Node]或[共享模式Node]
+     * 创建的[模式Node]会记下当前线程的引用，并进入同步队列进行排队
+     */
+    private Node addWaiter(Node mode) {
+        // 创建一个独占/共享模式的node，该node存储了当前线程的引用
+        Node node = new Node(Thread.currentThread(), mode);
+        // Try the fast path of enq; backup to full enq on failure
+        Node pred = tail;
+        // 队尾不为null，则需要将node添加到tail后
+        if (pred != null) {
+            // 设置node的前驱为原始的队尾节点
+            node.prev = pred;
+            //  更新队尾指向node
+            if (compareAndSetTail(pred, node)) {
+                // 设置原始的队尾节点的next为node，形成双向链表
+                pred.next = node;
+                // 返回原始的队尾节点
+                return node;
+            }
+        }
+        // 队尾节点为null，则head也为null,插入node
+        enq(node);
+        // 此时返回的node，代表了队尾
+        return node;
+    }
+
+    /**
+     * Sets head of queue to be node, thus dequeuing. Called only by
+     * acquire methods.  Also nulls out unused fields for sake of GC
+     * and to suppress unnecessary signals and traversals.
+     *
+     * @param node the node
+     */
+    private void setHead(Node node) {
+        head = node;
+        node.thread = null;
+        node.prev = null;
+    }
+
+    /**
+     * Wakes up node's successor, if one exists.
+     *
+     * @param node the node
+     */
+    // 唤醒node后面陷入阻塞的“后继”
+    private void unparkSuccessor(Node node) {
+        /*
+         * If status is negative (i.e., possibly needing signal) try
+         * to clear in anticipation of signalling.  It is OK if this
+         * fails or if status is changed by waiting thread.
+         */
+        int ws = node.waitStatus;
+        if (ws < 0)
+            // 如果node状态码为负，则将其重置为0
+            compareAndSetWaitStatus(node, ws, 0);
+
+        /*
+         * Thread to unpark is held in successor, which is normally
+         * just the next node.  But if cancelled or apparently null,
+         * traverse backwards from tail to find the actual
+         * non-cancelled successor.
+         */
+        Node s = node.next;
+        /*
+         * 如果s==null，说明node已经是尾结点，后面没有需要唤醒的结点了
+         *
+         * 如果s!=null，且s.waitStatus>0，说明node被标记为Node.CANCELLED（取消）
+         * 此时，需要从尾端向前遍历，找到离s最近的正处于阻塞的后继，以便后续唤醒它
+         */
+        if (s == null || s.waitStatus > 0) {
+            s = null;
+            for (Node t = tail; t != null && t != node; t = t.prev)
+                if (t.waitStatus <= 0)
+                    s = t;
+        }
+        // 唤醒node的后继
+        if (s != null)
+            LockSupport.unpark(s.thread);
+    }
+
+    /**
+     * Release action for shared mode -- signals successor and ensures
+     * propagation. (Note: For exclusive mode, release just amounts
+     * to calling unparkSuccessor of head if it needs signal.)
+     */
+    private void doReleaseShared() {
+        /*
+         * Ensure that a release propagates, even if there are other
+         * in-progress acquires/releases.  This proceeds in the usual
+         * way of trying to unparkSuccessor of head if it needs
+         * signal. But if it does not, status is set to PROPAGATE to
+         * ensure that upon release, propagation continues.
+         * Additionally, we must loop in case a new node is added
+         * while we are doing this. Also, unlike other uses of
+         * unparkSuccessor, we need to know if CAS to reset status
+         * fails, if so rechecking.
+         */
+        for (; ; ) {
+            Node h = head;
+            if (h != null && h != tail) {
+                int ws = h.waitStatus;
+                if (ws == Node.SIGNAL) {
+                    if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0))
+                        continue;            // loop to recheck cases
+                    unparkSuccessor(h);
+                } else if (ws == 0 &&
+                        !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))
+                    continue;                // loop on failed CAS
+            }
+            if (h == head)                   // loop if head changed
+                break;
+        }
+    }
+
+    /**
+     * Sets head of queue, and checks if successor may be waiting
+     * in shared mode, if so propagating if either propagate > 0 or
+     * PROPAGATE status was set.
+     *
+     * @param node      the node
+     * @param propagate the return value from a tryAcquireShared
+     */
+    private void setHeadAndPropagate(Node node, int propagate) {
+        Node h = head; // Record old head for check below
+        setHead(node);
+        /*
+         * Try to signal next queued node if:
+         *   Propagation was indicated by caller,
+         *     or was recorded (as h.waitStatus either before
+         *     or after setHead) by a previous operation
+         *     (note: this uses sign-check of waitStatus because
+         *      PROPAGATE status may transition to SIGNAL.)
+         * and
+         *   The next node is waiting in shared mode,
+         *     or we don't know, because it appears null
+         *
+         * The conservatism in both of these checks may cause
+         * unnecessary wake-ups, but only when there are multiple
+         * racing acquires/releases, so most need signals now or soon
+         * anyway.
+         */
+        if (propagate > 0 || h == null || h.waitStatus < 0 ||
+                (h = head) == null || h.waitStatus < 0) {
+            Node s = node.next;
+            if (s == null || s.isShared())
+                doReleaseShared();
+        }
+    }
+
+    // Main exported methods
+
+    /**
+     * Cancels an ongoing attempt to acquire.
+     *
+     * @param node the node
+     */
+    // 标记node结点为Node.CANCELLED（取消）状态
+    private void cancelAcquire(Node node) {
+        // Ignore if node doesn't exist
+        if (node == null)
+            return;
+        // 删除对线程的引用
+        node.thread = null;
+
+        // Skip cancelled predecessors
+        Node pred = node.prev;
+        // 顺着node的前驱向前遍历，将标记为取消的node结点连成一片
+        while (pred.waitStatus > 0){
+            node.prev = pred = pred.prev;
+        }
+
+        // predNext is the apparent node to unsplice. CASes below will
+        // fail if not, in which case, we lost race vs another cancel
+        // or signal, so no further action is necessary.
+        Node predNext = pred.next;
+
+        // Can use unconditional write instead of CAS here.
+        // After this atomic step, other Nodes can skip past us.
+        // Before, we are free of interference from other threads.
+        node.waitStatus = Node.CANCELLED;
+
+        // If we are the tail, remove ourselves.
+        if (node == tail && compareAndSetTail(node, pred)) {
+            compareAndSetNext(pred, predNext, null);
+        } else {
+            // If successor needs signal, try to set pred's next-link
+            // so it will get one. Otherwise wake it up to propagate.
+            int ws;
+            if (pred != head &&
+                    ((ws = pred.waitStatus) == Node.SIGNAL ||
+                            (ws <= 0 && compareAndSetWaitStatus(pred, ws, Node.SIGNAL))) &&
+                    pred.thread != null) {
+                Node next = node.next;
+                // 将处于阻塞状态的node连成一片，通过后继向后遍历即可获得
+                if (next != null && next.waitStatus <= 0)
+                    compareAndSetNext(pred, predNext, next);
+            } else {
+                // 唤醒node后面陷入阻塞的“后继”
+                unparkSuccessor(node);
+            }
+
+            node.next = node; // help GC
+        }
+    }
+
+    /**
+     * Convenience method to park and then check if interrupted
+     *
+     * @return {@code true} if interrupted
+     */
+    // 设置线程进入阻塞状态，并清除线程的中断状态。返回值代表之前线程是否处于阻塞状态
+    private final boolean parkAndCheckInterrupt() {
+        // 设置线程阻塞（对标记为中断的线程无效）
+        LockSupport.park(this);
+        return Thread.interrupted();
+    }
+
+    /**
+     * Acquires in exclusive uninterruptible mode for thread already in
+     * queue. Used by condition wait methods as well as acquire.
+     *
+     * @param node the node
+     * @param arg  the acquire argument
+     * @return {@code true} if interrupted while waiting
+     */
+    // 当node进入排队后再次尝试申请锁，如果还是失败，则可能进入阻塞
+    final boolean acquireQueued(final Node node, int arg) {
+        // 获取锁是否成功
+        boolean failed = true;
+        try {
+            // 当前线程是否中断
+            boolean interrupted = false;
+            // 死循环，成功获取锁时退出
+            // 每个陷入阻塞的线程醒来时，都需要重新申请锁
+            // 只有当节点排队排在队头的时候，才可以尝试申请锁
+            // 申请成功之后，丢弃原本的头节点，并将自身作为头节点，返回
+            for (; ; ) {
+                // 获取node节点的前驱节点
+                final Node p = node.predecessor();
+                // 若node节点已经排到队头了，则尝试获取锁
+                if (p == head) {
+                    // 尝试申请锁
+                    if (tryAcquire(arg)) {
+                        // 获取锁成功，设置node为头节点（丢弃原始的头节点）
+                        setHead(node);
+                        // 切断原本的头节点与后一个节点的联系，以便GC
+                        p.next = null; // help GC
+                        // 获取锁成功，不需要撤销当前线程对锁的申请
+                        failed = false;
+                        // 返回线程当前的中断标记（如果线程在阻塞期间被标记为中断，这里会返回true）
+                        return interrupted;
+                    }
+                }
+                // 若没有排在队头或申请锁失败，尝试设置node的前置为阻塞标志（每个节点的阻塞标志是记录在前置节点上）
+                if (shouldParkAfterFailedAcquire(p, node)) {
+                    /**
+                     * 使线程进入阻塞
+                     * 如果首次到达这里时线程被标记为中断，则此步只是简单地清除中断标记，并返回true
+                     * 接下来，通过死循环，线程再次来到这里，然后进入阻塞(park)...
+                     *
+                     * 如果首次到达这里时线程没有被标记为中断，则直接进入阻塞(park)
+                     *
+                     * 当线程被唤醒后，返回线程当前的中断标记（阻塞(park)期间也可设置中断标记）
+                     */
+                    if (parkAndCheckInterrupt()) {
+                        interrupted = true;
+                    }
+                }
+            }
+        } finally {
+            // 获取锁失败
+            if (failed) {
+                // 撤销当前线程对锁的申请
+                cancelAcquire(node);
+            }
+
+        }
+    }
+
+    /**
+     * Acquires in exclusive interruptible mode.
+     *
+     * @param arg the acquire argument
+     */
+    //抢锁失败后，尝试将其阻塞
+    private void doAcquireInterruptibly(int arg)
+            throws InterruptedException {
+        // 向【|同步队列|】添加一个[独占模式Node]作为排队者
+        final Node node = addWaiter(Node.EXCLUSIVE);
+        boolean failed = true;
+        try {
+            // 死循环，成功申请到锁后退出
+            for (; ; ) {
+                // 获取node结点的前驱
+                final Node p = node.predecessor();
+                // 如果node结点目前排在了队首，则node线程有权利申请锁
+                if(p == head) {
+                    // 尝试申请锁
+                    if(tryAcquire(arg)){
+                        // 设置node为头结点（即丢掉了原来的头结点）
+                        setHead(node);
+                        // 切断旧的头结点与后一个结点的联系，以便GC
+                        p.next = null;
+                        return;
+                    }
+                }
+                // 抢锁失败时，尝试为node的前驱设置阻塞标记（每个结点的阻塞标记设置在其前驱上）
+                if(shouldParkAfterFailedAcquire(p, node)) {
+                    // 设置当前线程进入阻塞状态，并清除当前线程的中断状态
+                    if(parkAndCheckInterrupt()){
+                        // 如果线程被唤醒时拥有中断标记（在阻塞期间设置的），这里抛出异常
+                        throw new InterruptedException();
+                    }
+                }
+            }
+        } finally {
+            // 获取锁失败
+            if (failed)
+                // 如果中途有异常发生，应当撤销当前线程对锁的申请
+                cancelAcquire(node);
+        }
+    }
+
+    /**
+     * Acquires in exclusive timed mode.
+     *
+     * @param arg          the acquire argument
+     * @param nanosTimeout max wait time
+     * @return {@code true} if acquired
+     */
+    private boolean doAcquireNanos(int arg, long nanosTimeout)
+            throws InterruptedException {
+        if (nanosTimeout <= 0L)
+            return false;
+        final long deadline = System.nanoTime() + nanosTimeout;
+        final Node node = addWaiter(Node.EXCLUSIVE);
+        boolean failed = true;
+        try {
+            for (; ; ) {
+                final Node p = node.predecessor();
+                if (p == head && tryAcquire(arg)) {
+                    setHead(node);
+                    p.next = null; // help GC
+                    failed = false;
+                    return true;
+                }
+                nanosTimeout = deadline - System.nanoTime();
+                if (nanosTimeout <= 0L)
+                    return false;
+                if (shouldParkAfterFailedAcquire(p, node) &&
+                        nanosTimeout > spinForTimeoutThreshold)
+                    LockSupport.parkNanos(this, nanosTimeout);
+                if (Thread.interrupted())
+                    throw new InterruptedException();
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+
+    /**
+     * Acquires in shared uninterruptible mode.
+     *
+     * @param arg the acquire argument
+     */
+    private void doAcquireShared(int arg) {
+        final Node node = addWaiter(Node.SHARED);
+        boolean failed = true;
+        try {
+            boolean interrupted = false;
+            for (; ; ) {
+                final Node p = node.predecessor();
+                if (p == head) {
+                    int r = tryAcquireShared(arg);
+                    if (r >= 0) {
+                        setHeadAndPropagate(node, r);
+                        p.next = null; // help GC
+                        if (interrupted)
+                            selfInterrupt();
+                        failed = false;
+                        return;
+                    }
+                }
+                if (shouldParkAfterFailedAcquire(p, node) &&
+                        parkAndCheckInterrupt())
+                    interrupted = true;
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+
+    /**
+     * Acquires in shared interruptible mode.
+     *
+     * @param arg the acquire argument
+     */
+    private void doAcquireSharedInterruptibly(int arg)
+            throws InterruptedException {
+        final Node node = addWaiter(Node.SHARED);
+        boolean failed = true;
+        try {
+            for (; ; ) {
+                final Node p = node.predecessor();
+                if (p == head) {
+                    int r = tryAcquireShared(arg);
+                    if (r >= 0) {
+                        setHeadAndPropagate(node, r);
+                        p.next = null; // help GC
+                        failed = false;
+                        return;
+                    }
+                }
+                if (shouldParkAfterFailedAcquire(p, node) &&
+                        parkAndCheckInterrupt())
+                    throw new InterruptedException();
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+
+    /**
+     * Acquires in shared timed mode.
+     *
+     * @param arg          the acquire argument
+     * @param nanosTimeout max wait time
+     * @return {@code true} if acquired
+     */
+    private boolean doAcquireSharedNanos(int arg, long nanosTimeout)
+            throws InterruptedException {
+        if (nanosTimeout <= 0L)
+            return false;
+        final long deadline = System.nanoTime() + nanosTimeout;
+        final Node node = addWaiter(Node.SHARED);
+        boolean failed = true;
+        try {
+            for (; ; ) {
+                final Node p = node.predecessor();
+                if (p == head) {
+                    int r = tryAcquireShared(arg);
+                    if (r >= 0) {
+                        setHeadAndPropagate(node, r);
+                        p.next = null; // help GC
+                        failed = false;
+                        return true;
+                    }
+                }
+                nanosTimeout = deadline - System.nanoTime();
+                if (nanosTimeout <= 0L)
+                    return false;
+                if (shouldParkAfterFailedAcquire(p, node) &&
+                        nanosTimeout > spinForTimeoutThreshold)
+                    LockSupport.parkNanos(this, nanosTimeout);
+                if (Thread.interrupted())
+                    throw new InterruptedException();
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+
+    /**
+     * Attempts to acquire in exclusive mode. This method should query
+     * if the state of the object permits it to be acquired in the
+     * exclusive mode, and if so to acquire it.
+     *
+     * <p>This method is always invoked by the thread performing
+     * acquire.  If this method reports failure, the acquire method
+     * may queue the thread, if it is not already queued, until it is
+     * signalled by a release from some other thread. This can be used
+     * to implement method {@link Lock#tryLock()}.
+     *
+     * <p>The default
+     * implementation throws {@link UnsupportedOperationException}.
+     *
+     * @param arg the acquire argument. This value is always the one
+     *            passed to an acquire method, or is the value saved on entry
+     *            to a condition wait.  The value is otherwise uninterpreted
+     *            and can represent anything you like.
+     * @return {@code true} if successful. Upon success, this object has
+     * been acquired.
+     * @throws IllegalMonitorStateException  if acquiring would place this
+     *                                       synchronizer in an illegal state. This exception must be
+     *                                       thrown in a consistent fashion for synchronization to work
+     *                                       correctly.
+     * @throws UnsupportedOperationException if exclusive mode is not supported
+     */
+    protected boolean tryAcquire(int arg) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Attempts to set the state to reflect a release in exclusive
+     * mode.
+     *
+     * <p>This method is always invoked by the thread performing release.
+     *
+     * <p>The default implementation throws
+     * {@link UnsupportedOperationException}.
+     *
+     * @param arg the release argument. This value is always the one
+     *            passed to a release method, or the current state value upon
+     *            entry to a condition wait.  The value is otherwise
+     *            uninterpreted and can represent anything you like.
+     * @return {@code true} if this object is now in a fully released
+     * state, so that any waiting threads may attempt to acquire;
+     * and {@code false} otherwise.
+     * @throws IllegalMonitorStateException  if releasing would place this
+     *                                       synchronizer in an illegal state. This exception must be
+     *                                       thrown in a consistent fashion for synchronization to work
+     *                                       correctly.
+     * @throws UnsupportedOperationException if exclusive mode is not supported
+     */
+    protected boolean tryRelease(int arg) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Attempts to acquire in shared mode. This method should query if
+     * the state of the object permits it to be acquired in the shared
+     * mode, and if so to acquire it.
+     *
+     * <p>This method is always invoked by the thread performing
+     * acquire.  If this method reports failure, the acquire method
+     * may queue the thread, if it is not already queued, until it is
+     * signalled by a release from some other thread.
+     *
+     * <p>The default implementation throws {@link
+     * UnsupportedOperationException}.
+     *
+     * @param arg the acquire argument. This value is always the one
+     *            passed to an acquire method, or is the value saved on entry
+     *            to a condition wait.  The value is otherwise uninterpreted
+     *            and can represent anything you like.
+     * @return a negative value on failure; zero if acquisition in shared
+     * mode succeeded but no subsequent shared-mode acquire can
+     * succeed; and a positive value if acquisition in shared
+     * mode succeeded and subsequent shared-mode acquires might
+     * also succeed, in which case a subsequent waiting thread
+     * must check availability. (Support for three different
+     * return values enables this method to be used in contexts
+     * where acquires only sometimes act exclusively.)  Upon
+     * success, this object has been acquired.
+     * @throws IllegalMonitorStateException  if acquiring would place this
+     *                                       synchronizer in an illegal state. This exception must be
+     *                                       thrown in a consistent fashion for synchronization to work
+     *                                       correctly.
+     * @throws UnsupportedOperationException if shared mode is not supported
+     */
+    protected int tryAcquireShared(int arg) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Attempts to set the state to reflect a release in shared mode.
+     *
+     * <p>This method is always invoked by the thread performing release.
+     *
+     * <p>The default implementation throws
+     * {@link UnsupportedOperationException}.
+     *
+     * @param arg the release argument. This value is always the one
+     *            passed to a release method, or the current state value upon
+     *            entry to a condition wait.  The value is otherwise
+     *            uninterpreted and can represent anything you like.
+     * @return {@code true} if this release of shared mode may permit a
+     * waiting acquire (shared or exclusive) to succeed; and
+     * {@code false} otherwise
+     * @throws IllegalMonitorStateException  if releasing would place this
+     *                                       synchronizer in an illegal state. This exception must be
+     *                                       thrown in a consistent fashion for synchronization to work
+     *                                       correctly.
+     * @throws UnsupportedOperationException if shared mode is not supported
+     */
+    protected boolean tryReleaseShared(int arg) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Returns {@code true} if synchronization is held exclusively with
+     * respect to the current (calling) thread.  This method is invoked
+     * upon each call to a non-waiting {@link ConditionObject} method.
+     * (Waiting methods instead invoke {@link #release}.)
+     *
+     * <p>The default implementation throws {@link
+     * UnsupportedOperationException}. This method is invoked
+     * internally only within {@link ConditionObject} methods, so need
+     * not be defined if conditions are not used.
+     *
+     * @return {@code true} if synchronization is held exclusively;
+     * {@code false} otherwise
+     * @throws UnsupportedOperationException if conditions are not supported
+     */
+    protected boolean isHeldExclusively() {
+        throw new UnsupportedOperationException();
+    }
+
+    // Queue inspection methods
+
+    /**
+     * Acquires in exclusive mode, ignoring interrupts.  Implemented
+     * by invoking at least once {@link #tryAcquire},
+     * returning on success.  Otherwise the thread is queued, possibly
+     * repeatedly blocking and unblocking, invoking {@link
+     * #tryAcquire} until success.  This method can be used
+     * to implement method {@link Lock#lock}.
+     *
+     * @param arg the acquire argument.  This value is conveyed to
+     *            {@link #tryAcquire} but is otherwise uninterpreted and
+     *            can represent anything you like.
+     */
+    // 申请独占锁，允许阻塞带有中断标记的线程（会先将其标记清除）
+    public final void acquire(int arg) {
+        // 尝试申请独占锁
+        if (!tryAcquire(arg)) {
+            /*
+             * 如果当前线程没有申请到独占锁，则需要去排队
+             * 注：线程被封装到Node中去排队
+             */
+
+            // 向【|同步队列|】添加一个[独占模式Node](持有争锁线程)作为排队者
+            Node node = addWaiter(Node.EXCLUSIVE);
+
+            // 当node进入排队后再次尝试申请锁，如果还是失败，则可能进入阻塞
+            if (acquireQueued(node, arg)) {
+                // 如果线程解除阻塞时拥有中断标记，此处要进行设置
+                selfInterrupt();
+            }
+        }
+    }
+
+    /**
+     * Acquires in exclusive mode, aborting if interrupted.
+     * Implemented by first checking interrupt status, then invoking
+     * at least once {@link #tryAcquire}, returning on
+     * success.  Otherwise the thread is queued, possibly repeatedly
+     * blocking and unblocking, invoking {@link #tryAcquire}
+     * until success or the thread is interrupted.  This method can be
+     * used to implement method {@link Lock#lockInterruptibly}.
+     *
+     * @param arg the acquire argument.  This value is conveyed to
+     *            {@link #tryAcquire} but is otherwise uninterpreted and
+     *            can represent anything you like.
+     * @throws InterruptedException if the current thread is interrupted
+     */
+    // 申请独占锁，不允许阻塞带有中断标记的线程
+    public final void acquireInterruptibly(int arg)
+            throws InterruptedException {
+        // 测试当前线程是否已经中断，线程的中断状态会被清除
+        if(Thread.interrupted()) {
+            // 如果当前线程有中断标记，则抛出异常
+            throw new InterruptedException();
+        }
+        // 尝试申请独占锁
+        if (!tryAcquire(arg))
+            doAcquireInterruptibly(arg);
+    }
+
+    /**
+     * Attempts to acquire in exclusive mode, aborting if interrupted,
+     * and failing if the given timeout elapses.  Implemented by first
+     * checking interrupt status, then invoking at least once {@link
+     * #tryAcquire}, returning on success.  Otherwise, the thread is
+     * queued, possibly repeatedly blocking and unblocking, invoking
+     * {@link #tryAcquire} until success or the thread is interrupted
+     * or the timeout elapses.  This method can be used to implement
+     * method {@link Lock#tryLock(long, TimeUnit)}.
+     *
+     * @param arg          the acquire argument.  This value is conveyed to
+     *                     {@link #tryAcquire} but is otherwise uninterpreted and
+     *                     can represent anything you like.
+     * @param nanosTimeout the maximum number of nanoseconds to wait
+     * @return {@code true} if acquired; {@code false} if timed out
+     * @throws InterruptedException if the current thread is interrupted
+     */
+    public final boolean tryAcquireNanos(int arg, long nanosTimeout)
+            throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        return tryAcquire(arg) ||
+                doAcquireNanos(arg, nanosTimeout);
+    }
+
+    /**
+     * Releases in exclusive mode.  Implemented by unblocking one or
+     * more threads if {@link #tryRelease} returns true.
+     * This method can be used to implement method {@link Lock#unlock}.
+     *
+     * @param arg the release argument.  This value is conveyed to
+     *            {@link #tryRelease} but is otherwise uninterpreted and
+     *            can represent anything you like.
+     * @return the value returned from {@link #tryRelease}
+     */
+    // 释放锁，如果锁已被完全释放，则唤醒后续的阻塞线程。返回值表示本次操作后锁是否只有自由，没有线程持有
+    public final boolean release(int arg) {
+        // 释放一次锁，返回值表示同步锁是否处于自由状态（无线程持有）
+        if (tryRelease(arg)) {
+            //  /* 如果锁已经处于自由状态，则可以唤醒下一个阻塞的线程了 */
+            Node h = head;
+            if (h != null && h.waitStatus != 0){
+                // 唤醒h后面陷入阻塞的“后继”
+                unparkSuccessor(h);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Acquires in shared mode, ignoring interrupts.  Implemented by
+     * first invoking at least once {@link #tryAcquireShared},
+     * returning on success.  Otherwise the thread is queued, possibly
+     * repeatedly blocking and unblocking, invoking {@link
+     * #tryAcquireShared} until success.
+     *
+     * @param arg the acquire argument.  This value is conveyed to
+     *            {@link #tryAcquireShared} but is otherwise uninterpreted
+     *            and can represent anything you like.
+     */
+    public final void acquireShared(int arg) {
+        if (tryAcquireShared(arg) < 0)
+            doAcquireShared(arg);
+    }
+
+    /**
+     * Acquires in shared mode, aborting if interrupted.  Implemented
+     * by first checking interrupt status, then invoking at least once
+     * {@link #tryAcquireShared}, returning on success.  Otherwise the
+     * thread is queued, possibly repeatedly blocking and unblocking,
+     * invoking {@link #tryAcquireShared} until success or the thread
+     * is interrupted.
+     *
+     * @param arg the acquire argument.
+     *            This value is conveyed to {@link #tryAcquireShared} but is
+     *            otherwise uninterpreted and can represent anything
+     *            you like.
+     * @throws InterruptedException if the current thread is interrupted
+     */
+    public final void acquireSharedInterruptibly(int arg)
+            throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        if (tryAcquireShared(arg) < 0)
+            doAcquireSharedInterruptibly(arg);
+    }
+
+    /**
+     * Attempts to acquire in shared mode, aborting if interrupted, and
+     * failing if the given timeout elapses.  Implemented by first
+     * checking interrupt status, then invoking at least once {@link
+     * #tryAcquireShared}, returning on success.  Otherwise, the
+     * thread is queued, possibly repeatedly blocking and unblocking,
+     * invoking {@link #tryAcquireShared} until success or the thread
+     * is interrupted or the timeout elapses.
+     *
+     * @param arg          the acquire argument.  This value is conveyed to
+     *                     {@link #tryAcquireShared} but is otherwise uninterpreted
+     *                     and can represent anything you like.
+     * @param nanosTimeout the maximum number of nanoseconds to wait
+     * @return {@code true} if acquired; {@code false} if timed out
+     * @throws InterruptedException if the current thread is interrupted
+     */
+    public final boolean tryAcquireSharedNanos(int arg, long nanosTimeout)
+            throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        return tryAcquireShared(arg) >= 0 ||
+                doAcquireSharedNanos(arg, nanosTimeout);
+    }
+
+
+    // Instrumentation and monitoring methods
+
+    /**
+     * Releases in shared mode.  Implemented by unblocking one or more
+     * threads if {@link #tryReleaseShared} returns true.
+     *
+     * @param arg the release argument.  This value is conveyed to
+     *            {@link #tryReleaseShared} but is otherwise uninterpreted
+     *            and can represent anything you like.
+     * @return the value returned from {@link #tryReleaseShared}
+     */
+    public final boolean releaseShared(int arg) {
+        if (tryReleaseShared(arg)) {
+            doReleaseShared();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Queries whether any threads are waiting to acquire. Note that
+     * because cancellations due to interrupts and timeouts may occur
+     * at any time, a {@code true} return does not guarantee that any
+     * other thread will ever acquire.
+     *
+     * <p>In this implementation, this operation returns in
+     * constant time.
+     *
+     * @return {@code true} if there may be other threads waiting to acquire
+     */
+    // 判断【|同步队列|】中是否存在排队的结点（线程）
+    public final boolean hasQueuedThreads() {
+        return head != tail;
+    }
+
+    /**
+     * Queries whether any threads have ever contended to acquire this
+     * synchronizer; that is if an acquire method has ever blocked.
+     *
+     * <p>In this implementation, this operation returns in
+     * constant time.
+     *
+     * @return {@code true} if there has ever been contention
+     */
+    // 判断是否存在线程争用
+    public final boolean hasContended() {
+        return head != null;
+    }
+
+    /**
+     * Returns the first (longest-waiting) thread in the queue, or
+     * {@code null} if no threads are currently queued.
+     *
+     * <p>In this implementation, this operation normally returns in
+     * constant time, but may iterate upon contention if other threads are
+     * concurrently modifying the queue.
+     *
+     * @return the first (longest-waiting) thread in the queue, or
+     * {@code null} if no threads are currently queued
+     */
+    // 返回【|同步队列|】中首个排队的线程（可能为空）
+    public final Thread getFirstQueuedThread() {
+        // handle only fast path, else relay
+        return (head == tail) ? null : fullGetFirstQueuedThread();
+    }
+
+    /**
+     * Version of getFirstQueuedThread called when fastpath fails
+     */
+    // 返回【|同步队列|】中首个排队的线程（存在排队线程的情形下才使用该方法）
+    private Thread fullGetFirstQueuedThread() {
+        /*
+         * The first node is normally head.next. Try to get its
+         * thread field, ensuring consistent reads: If thread
+         * field is nulled out or s.prev is no longer head, then
+         * some other thread(s) concurrently performed setHead in
+         * between some of our reads. We try this twice before
+         * resorting to traversal.
+         */
+        Node h, s;
+        Thread st;
+        if (((h = head) != null && (s = h.next) != null &&
+                s.prev == head && (st = s.thread) != null) ||
+                ((h = head) != null && (s = h.next) != null &&
+                        s.prev == head && (st = s.thread) != null))
+            return st;
+
+        /*
+         * Head's next field might not have been set yet, or may have
+         * been unset after setHead. So we must check to see if tail
+         * is actually first node. If not, we continue on, safely
+         * traversing from tail back to head to find first,
+         * guaranteeing termination.
+         */
+
+        Node t = tail;
+        Thread firstThread = null;
+        while (t != null && t != head) {
+            Thread tt = t.thread;
+            if (tt != null)
+                firstThread = tt;
+            t = t.prev;
+        }
+        return firstThread;
+    }
+
+
+    // Internal support methods for Conditions
+
+    /**
+     * Returns true if the given thread is currently queued.
+     *
+     * <p>This implementation traverses the queue to determine
+     * presence of the given thread.
+     *
+     * @param thread the thread
+     * @return {@code true} if the given thread is on the queue
+     * @throws NullPointerException if the thread is null
+     */
+    // 判断指定的线程是否在【|同步队列|】中排队
+    public final boolean isQueued(Thread thread) {
+        if (thread == null)
+            throw new NullPointerException();
+        for (Node p = tail; p != null; p = p.prev)
+            if (p.thread == thread)
+                return true;
+        return false;
+    }
+
+    /**
+     * Returns {@code true} if the apparent first queued thread, if one
+     * exists, is waiting in exclusive mode.  If this method returns
+     * {@code true}, and the current thread is attempting to acquire in
+     * shared mode (that is, this method is invoked from {@link
+     * #tryAcquireShared}) then it is guaranteed that the current thread
+     * is not the first queued thread.  Used only as a heuristic in
+     * ReentrantReadWriteLock.
+     */
+    final boolean apparentlyFirstQueuedIsExclusive() {
+        Node h, s;
+        return (h = head) != null &&
+                (s = h.next) != null &&
+                !s.isShared() &&
+                s.thread != null;
+    }
+
+    /**
+     * Queries whether any threads have been waiting to acquire longer
+     * than the current thread.
+     *
+     * <p>An invocation of this method is equivalent to (but may be
+     * more efficient than):
+     * <pre> {@code
+     * getFirstQueuedThread() != Thread.currentThread() &&
+     * hasQueuedThreads()}</pre>
+     *
+     * <p>Note that because cancellations due to interrupts and
+     * timeouts may occur at any time, a {@code true} return does not
+     * guarantee that some other thread will acquire before the current
+     * thread.  Likewise, it is possible for another thread to win a
+     * race to enqueue after this method has returned {@code false},
+     * due to the queue being empty.
+     *
+     * <p>This method is designed to be used by a fair synchronizer to
+     * avoid <a href="AbstractQueuedSynchronizer#barging">barging</a>.
+     * Such a synchronizer's {@link #tryAcquire} method should return
+     * {@code false}, and its {@link #tryAcquireShared} method should
+     * return a negative value, if this method returns {@code true}
+     * (unless this is a reentrant acquire).  For example, the {@code
+     * tryAcquire} method for a fair, reentrant, exclusive mode
+     * synchronizer might look like this:
+     *
+     * <pre> {@code
+     * protected boolean tryAcquire(int arg) {
+     *   if (isHeldExclusively()) {
+     *     // A reentrant acquire; increment hold count
+     *     return true;
+     *   } else if (hasQueuedPredecessors()) {
+     *     return false;
+     *   } else {
+     *     // try to acquire normally
+     *   }
+     * }}</pre>
+     *
+     * @return {@code true} if there is a queued thread preceding the
+     * current thread, and {@code false} if the current thread
+     * is at the head of the queue or the queue is empty
+     * @since 1.7
+     */
+    public final boolean hasQueuedPredecessors() {
+        // The correctness of this depends on head being initialized
+        // before tail and on head.next being accurate if the current
+        // thread is first in queue.
+        Node t = tail; // Read fields in reverse initialization order
+        Node h = head;
+        Node s;
+        return h != t &&
+                ((s = h.next) == null || s.thread != Thread.currentThread());
+    }
+
+    /**
+     * Returns an estimate of the number of threads waiting to
+     * acquire.  The value is only an estimate because the number of
+     * threads may change dynamically while this method traverses
+     * internal data structures.  This method is designed for use in
+     * monitoring system state, not for synchronization
+     * control.
+     *
+     * @return the estimated number of threads waiting to acquire
+     */
+    public final int getQueueLength() {
+        int n = 0;
+        for (Node p = tail; p != null; p = p.prev) {
+            if (p.thread != null)
+                ++n;
+        }
+        return n;
+    }
+
+    /**
+     * Returns a collection containing threads that may be waiting to
+     * acquire.  Because the actual set of threads may change
+     * dynamically while constructing this result, the returned
+     * collection is only a best-effort estimate.  The elements of the
+     * returned collection are in no particular order.  This method is
+     * designed to facilitate construction of subclasses that provide
+     * more extensive monitoring facilities.
+     *
+     * @return the collection of threads
+     */
+    // 返回一个集合，包含了所有正在【|同步队列|】中排队的Node中的线程
+    public final Collection<Thread> getQueuedThreads() {
+        ArrayList<Thread> list = new ArrayList<Thread>();
+        for (Node p = tail; p != null; p = p.prev) {
+            Thread t = p.thread;
+            if (t != null)
+                list.add(t);
+        }
+        return list;
+    }
+
+    // Instrumentation methods for conditions
+
+    /**
+     * Returns a collection containing threads that may be waiting to
+     * acquire in exclusive mode. This has the same properties
+     * as {@link #getQueuedThreads} except that it only returns
+     * those threads waiting due to an exclusive acquire.
+     *
+     * @return the collection of threads
+     */
+    // 返回一个集合，包含了所有正在【|同步队列|】中排队的[独占模式Node]中的线程
+    public final Collection<Thread> getExclusiveQueuedThreads() {
+        ArrayList<Thread> list = new ArrayList<Thread>();
+        for (Node p = tail; p != null; p = p.prev) {
+            if (!p.isShared()) {
+                Thread t = p.thread;
+                if (t != null)
+                    list.add(t);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Returns a collection containing threads that may be waiting to
+     * acquire in shared mode. This has the same properties
+     * as {@link #getQueuedThreads} except that it only returns
+     * those threads waiting due to a shared acquire.
+     *
+     * @return the collection of threads
+     */
+    public final Collection<Thread> getSharedQueuedThreads() {
+        ArrayList<Thread> list = new ArrayList<Thread>();
+        for (Node p = tail; p != null; p = p.prev) {
+            if (p.isShared()) {
+                Thread t = p.thread;
+                if (t != null)
+                    list.add(t);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Returns a string identifying this synchronizer, as well as its state.
+     * The state, in brackets, includes the String {@code "State ="}
+     * followed by the current value of {@link #getState}, and either
+     * {@code "nonempty"} or {@code "empty"} depending on whether the
+     * queue is empty.
+     *
+     * @return a string identifying this synchronizer, as well as its state
+     */
+    public String toString() {
+        int s = getState();
+        String q = hasQueuedThreads() ? "non" : "";
+        return super.toString() +
+                "[State = " + s + ", " + q + "empty queue]";
+    }
+
+    /**
+     * Returns true if a node, always one that was initially placed on
+     * a condition queue, is now waiting to reacquire on sync queue.
+     *
+     * @param node the node
+     * @return true if is reacquiring
+     */
+    final boolean isOnSyncQueue(Node node) {
+        if (node.waitStatus == Node.CONDITION || node.prev == null)
+            return false;
+        if (node.next != null) // If has successor, it must be on queue
+            return true;
+        /*
+         * node.prev can be non-null, but not yet on queue because
+         * the CAS to place it on queue can fail. So we have to
+         * traverse from tail to make sure it actually made it.  It
+         * will always be near the tail in calls to this method, and
+         * unless the CAS failed (which is unlikely), it will be
+         * there, so we hardly ever traverse much.
+         */
+        return findNodeFromTail(node);
+    }
+
+    /**
+     * Returns true if node is on sync queue by searching backwards from tail.
+     * Called only when needed by isOnSyncQueue.
+     *
+     * @return true if present
+     */
+    private boolean findNodeFromTail(Node node) {
+        Node t = tail;
+        for (; ; ) {
+            if (t == node)
+                return true;
+            if (t == null)
+                return false;
+            t = t.prev;
+        }
+    }
+
+    /**
+     * Transfers a node from a condition queue onto sync queue.
+     * Returns true if successful.
+     *
+     * @param node the node
+     * @return true if successfully transferred (else the node was
+     * cancelled before signal)
+     */
+    final boolean transferForSignal(Node node) {
+        /*
+         * If cannot change waitStatus, the node has been cancelled.
+         */
+        if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
+            return false;
+
+        /*
+         * Splice onto queue and try to set waitStatus of predecessor to
+         * indicate that thread is (probably) waiting. If cancelled or
+         * attempt to set waitStatus fails, wake up to resync (in which
+         * case the waitStatus can be transiently and harmlessly wrong).
+         */
+        Node p = enq(node);
+        int ws = p.waitStatus;
+        if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+            LockSupport.unpark(node.thread);
+        return true;
+    }
+
+    /**
+     * Transfers node, if necessary, to sync queue after a cancelled wait.
+     * Returns true if thread was cancelled before being signalled.
+     *
+     * @param node the node
+     * @return true if cancelled before the node was signalled
+     */
+    final boolean transferAfterCancelledWait(Node node) {
+        if (compareAndSetWaitStatus(node, Node.CONDITION, 0)) {
+            enq(node);
+            return true;
+        }
+        /*
+         * If we lost out to a signal(), then we can't proceed
+         * until it finishes its enq().  Cancelling during an
+         * incomplete transfer is both rare and transient, so just
+         * spin.
+         */
+        while (!isOnSyncQueue(node))
+            Thread.yield();
+        return false;
+    }
+
+    /**
+     * Invokes release with current state value; returns saved state.
+     * Cancels node and throws exception on failure.
+     *
+     * @param node the condition node for this wait
+     * @return previous sync state
+     */
+    final int fullyRelease(Node node) {
+        boolean failed = true;
+        try {
+            int savedState = getState();
+            if (release(savedState)) {
+                failed = false;
+                return savedState;
+            } else {
+                throw new IllegalMonitorStateException();
+            }
+        } finally {
+            if (failed)
+                node.waitStatus = Node.CANCELLED;
+        }
+    }
+
+    /**
+     * Queries whether the given ConditionObject
+     * uses this synchronizer as its lock.
+     *
+     * @param condition the condition
+     * @return {@code true} if owned
+     * @throws NullPointerException if the condition is null
+     */
+    // 判断给定的条件对象是否归当前的同步队列（锁）所有
+    public final boolean owns(ConditionObject condition) {
+        return condition.isOwnedBy(this);
+    }
+
+    /**
+     * Queries whether any threads are waiting on the given condition
+     * associated with this synchronizer. Note that because timeouts
+     * and interrupts may occur at any time, a {@code true} return
+     * does not guarantee that a future {@code signal} will awaken
+     * any threads.  This method is designed primarily for use in
+     * monitoring of the system state.
+     *
+     * @param condition the condition
+     * @return {@code true} if there are any waiting threads
+     * @throws IllegalMonitorStateException if exclusive synchronization
+     *                                      is not held
+     * @throws IllegalArgumentException     if the given condition is
+     *                                      not associated with this synchronizer
+     * @throws NullPointerException         if the condition is null
+     */
+    public final boolean hasWaiters(ConditionObject condition) {
+        if (!owns(condition))
+            throw new IllegalArgumentException("Not owner");
+        return condition.hasWaiters();
+    }
+
+    /**
+     * Returns an estimate of the number of threads waiting on the
+     * given condition associated with this synchronizer. Note that
+     * because timeouts and interrupts may occur at any time, the
+     * estimate serves only as an upper bound on the actual number of
+     * waiters.  This method is designed for use in monitoring of the
+     * system state, not for synchronization control.
+     *
+     * @param condition the condition
+     * @return the estimated number of waiting threads
+     * @throws IllegalMonitorStateException if exclusive synchronization
+     *                                      is not held
+     * @throws IllegalArgumentException     if the given condition is
+     *                                      not associated with this synchronizer
+     * @throws NullPointerException         if the condition is null
+     */
+    public final int getWaitQueueLength(ConditionObject condition) {
+        if (!owns(condition))
+            throw new IllegalArgumentException("Not owner");
+        return condition.getWaitQueueLength();
+    }
+
+    /**
+     * Returns a collection containing those threads that may be
+     * waiting on the given condition associated with this
+     * synchronizer.  Because the actual set of threads may change
+     * dynamically while constructing this result, the returned
+     * collection is only a best-effort estimate. The elements of the
+     * returned collection are in no particular order.
+     *
+     * @param condition the condition
+     * @return the collection of threads
+     * @throws IllegalMonitorStateException if exclusive synchronization
+     *                                      is not held
+     * @throws IllegalArgumentException     if the given condition is
+     *                                      not associated with this synchronizer
+     * @throws NullPointerException         if the condition is null
+     */
+    public final Collection<Thread> getWaitingThreads(ConditionObject condition) {
+        if (!owns(condition))
+            throw new IllegalArgumentException("Not owner");
+        return condition.getWaitingThreads();
+    }
+
+    /**
+     * CAS head field. Used only by enq.
+     */
+    private final boolean compareAndSetHead(Node update) {
+        return unsafe.compareAndSwapObject(this, headOffset, null, update);
+    }
+
+    /**
+     * CAS tail field. Used only by enq.
+     */
+    private final boolean compareAndSetTail(Node expect, Node update) {
+        return unsafe.compareAndSwapObject(this, tailOffset, expect, update);
+    }
 
     /**
      * Wait queue node class.
@@ -378,16 +1900,26 @@ public abstract class AbstractQueuedSynchronizer
      * on the design of this class.
      */
     static final class Node {
-        /** Marker to indicate a node is waiting in shared mode */
+        /**
+         * Marker to indicate a node is waiting in shared mode
+         */
         static final Node SHARED = new Node();
-        /** Marker to indicate a node is waiting in exclusive mode */
+        /**
+         * Marker to indicate a node is waiting in exclusive mode
+         */
         static final Node EXCLUSIVE = null;
 
-        /** waitStatus value to indicate thread has cancelled */
-        static final int CANCELLED =  1;
-        /** waitStatus value to indicate successor's thread needs unparking */
-        static final int SIGNAL    = -1;
-        /** waitStatus value to indicate thread is waiting on condition */
+        /**
+         * waitStatus value to indicate thread has cancelled
+         */
+        static final int CANCELLED = 1;
+        /**
+         * waitStatus value to indicate successor's thread needs unparking
+         */
+        static final int SIGNAL = -1;
+        /**
+         * waitStatus value to indicate thread is waiting on condition
+         */
         static final int CONDITION = -2;
         /**
          * waitStatus value to indicate the next acquireShared should
@@ -397,34 +1929,34 @@ public abstract class AbstractQueuedSynchronizer
 
         /**
          * Status field, taking on only the values:
-         *   SIGNAL:     The successor of this node is (or will soon be)
-         *               blocked (via park), so the current node must
-         *               unpark its successor when it releases or
-         *               cancels. To avoid races, acquire methods must
-         *               first indicate they need a signal,
-         *               then retry the atomic acquire, and then,
-         *               on failure, block.
-         *   CANCELLED:  This node is cancelled due to timeout or interrupt.
-         *               Nodes never leave this state. In particular,
-         *               a thread with cancelled node never again blocks.
-         *   CONDITION:  This node is currently on a condition queue.
-         *               It will not be used as a sync queue node
-         *               until transferred, at which time the status
-         *               will be set to 0. (Use of this value here has
-         *               nothing to do with the other uses of the
-         *               field, but simplifies mechanics.)
-         *   PROPAGATE:  A releaseShared should be propagated to other
-         *               nodes. This is set (for head node only) in
-         *               doReleaseShared to ensure propagation
-         *               continues, even if other operations have
-         *               since intervened.
-         *   0:          None of the above
-         *
+         * SIGNAL:     The successor of this node is (or will soon be)
+         * blocked (via park), so the current node must
+         * unpark its successor when it releases or
+         * cancels. To avoid races, acquire methods must
+         * first indicate they need a signal,
+         * then retry the atomic acquire, and then,
+         * on failure, block.
+         * CANCELLED:  This node is cancelled due to timeout or interrupt.
+         * Nodes never leave this state. In particular,
+         * a thread with cancelled node never again blocks.
+         * CONDITION:  This node is currently on a condition queue.
+         * It will not be used as a sync queue node
+         * until transferred, at which time the status
+         * will be set to 0. (Use of this value here has
+         * nothing to do with the other uses of the
+         * field, but simplifies mechanics.)
+         * PROPAGATE:  A releaseShared should be propagated to other
+         * nodes. This is set (for head node only) in
+         * doReleaseShared to ensure propagation
+         * continues, even if other operations have
+         * since intervened.
+         * 0:          None of the above
+         * <p>
          * The values are arranged numerically to simplify use.
          * Non-negative values mean that a node doesn't need to
          * signal. So, most code doesn't need to check for particular
          * values, just for sign.
-         *
+         * <p>
          * The field is initialized to 0 for normal sync nodes, and
          * CONDITION for condition nodes.  It is modified using CAS
          * (or when possible, unconditional volatile writes).
@@ -477,6 +2009,19 @@ public abstract class AbstractQueuedSynchronizer
          */
         Node nextWaiter;
 
+        Node() {    // Used to establish initial head or SHARED marker
+        }
+
+        Node(Thread thread, Node mode) {     // Used by addWaiter
+            this.nextWaiter = mode;
+            this.thread = thread;
+        }
+
+        Node(Thread thread, int waitStatus) { // Used by Condition
+            this.waitStatus = waitStatus;
+            this.thread = thread;
+        }
+
         /**
          * Returns true if node is waiting in shared mode.
          */
@@ -498,1318 +2043,6 @@ public abstract class AbstractQueuedSynchronizer
             else
                 return p;
         }
-
-        Node() {    // Used to establish initial head or SHARED marker
-        }
-
-        Node(Thread thread, Node mode) {     // Used by addWaiter
-            this.nextWaiter = mode;
-            this.thread = thread;
-        }
-
-        Node(Thread thread, int waitStatus) { // Used by Condition
-            this.waitStatus = waitStatus;
-            this.thread = thread;
-        }
-    }
-
-    /**
-     * Head of the wait queue, lazily initialized.  Except for
-     * initialization, it is modified only via method setHead.  Note:
-     * If head exists, its waitStatus is guaranteed not to be
-     * CANCELLED.
-     */
-    private transient volatile Node head;
-
-    /**
-     * Tail of the wait queue, lazily initialized.  Modified only via
-     * method enq to add new wait node.
-     */
-    private transient volatile Node tail;
-
-    /**
-     * The synchronization state.
-     */
-    private volatile int state;
-
-    /**
-     * Returns the current value of synchronization state.
-     * This operation has memory semantics of a {@code volatile} read.
-     * @return current state value
-     */
-    protected final int getState() {
-        return state;
-    }
-
-    /**
-     * Sets the value of synchronization state.
-     * This operation has memory semantics of a {@code volatile} write.
-     * @param newState the new state value
-     */
-    protected final void setState(int newState) {
-        state = newState;
-    }
-
-    /**
-     * Atomically sets synchronization state to the given updated
-     * value if the current state value equals the expected value.
-     * This operation has memory semantics of a {@code volatile} read
-     * and write.
-     *
-     * @param expect the expected value
-     * @param update the new value
-     * @return {@code true} if successful. False return indicates that the actual
-     *         value was not equal to the expected value.
-     */
-    protected final boolean compareAndSetState(int expect, int update) {
-        // See below for intrinsics setup to support this
-        return unsafe.compareAndSwapInt(this, stateOffset, expect, update);
-    }
-
-    // Queuing utilities
-
-    /**
-     * The number of nanoseconds for which it is faster to spin
-     * rather than to use timed park. A rough estimate suffices
-     * to improve responsiveness with very short timeouts.
-     */
-    static final long spinForTimeoutThreshold = 1000L;
-
-    /**
-     * Inserts node into queue, initializing if necessary. See picture above.
-     * @param node the node to insert
-     * @return node's predecessor
-     */
-    private Node enq(final Node node) {
-        for (;;) {
-            Node t = tail;
-            if (t == null) { // Must initialize
-                if (compareAndSetHead(new Node()))
-                    tail = head;
-            } else {
-                node.prev = t;
-                if (compareAndSetTail(t, node)) {
-                    t.next = node;
-                    return t;
-                }
-            }
-        }
-    }
-
-    /**
-     * Creates and enqueues node for current thread and given mode.
-     *
-     * @param mode Node.EXCLUSIVE for exclusive, Node.SHARED for shared
-     * @return the new node
-     */
-    private Node addWaiter(Node mode) {
-        Node node = new Node(Thread.currentThread(), mode);
-        // Try the fast path of enq; backup to full enq on failure
-        Node pred = tail;
-        if (pred != null) {
-            node.prev = pred;
-            if (compareAndSetTail(pred, node)) {
-                pred.next = node;
-                return node;
-            }
-        }
-        enq(node);
-        return node;
-    }
-
-    /**
-     * Sets head of queue to be node, thus dequeuing. Called only by
-     * acquire methods.  Also nulls out unused fields for sake of GC
-     * and to suppress unnecessary signals and traversals.
-     *
-     * @param node the node
-     */
-    private void setHead(Node node) {
-        head = node;
-        node.thread = null;
-        node.prev = null;
-    }
-
-    /**
-     * Wakes up node's successor, if one exists.
-     *
-     * @param node the node
-     */
-    private void unparkSuccessor(Node node) {
-        /*
-         * If status is negative (i.e., possibly needing signal) try
-         * to clear in anticipation of signalling.  It is OK if this
-         * fails or if status is changed by waiting thread.
-         */
-        int ws = node.waitStatus;
-        if (ws < 0)
-            compareAndSetWaitStatus(node, ws, 0);
-
-        /*
-         * Thread to unpark is held in successor, which is normally
-         * just the next node.  But if cancelled or apparently null,
-         * traverse backwards from tail to find the actual
-         * non-cancelled successor.
-         */
-        Node s = node.next;
-        if (s == null || s.waitStatus > 0) {
-            s = null;
-            for (Node t = tail; t != null && t != node; t = t.prev)
-                if (t.waitStatus <= 0)
-                    s = t;
-        }
-        if (s != null)
-            LockSupport.unpark(s.thread);
-    }
-
-    /**
-     * Release action for shared mode -- signals successor and ensures
-     * propagation. (Note: For exclusive mode, release just amounts
-     * to calling unparkSuccessor of head if it needs signal.)
-     */
-    private void doReleaseShared() {
-        /*
-         * Ensure that a release propagates, even if there are other
-         * in-progress acquires/releases.  This proceeds in the usual
-         * way of trying to unparkSuccessor of head if it needs
-         * signal. But if it does not, status is set to PROPAGATE to
-         * ensure that upon release, propagation continues.
-         * Additionally, we must loop in case a new node is added
-         * while we are doing this. Also, unlike other uses of
-         * unparkSuccessor, we need to know if CAS to reset status
-         * fails, if so rechecking.
-         */
-        for (;;) {
-            Node h = head;
-            if (h != null && h != tail) {
-                int ws = h.waitStatus;
-                if (ws == Node.SIGNAL) {
-                    if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0))
-                        continue;            // loop to recheck cases
-                    unparkSuccessor(h);
-                }
-                else if (ws == 0 &&
-                         !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))
-                    continue;                // loop on failed CAS
-            }
-            if (h == head)                   // loop if head changed
-                break;
-        }
-    }
-
-    /**
-     * Sets head of queue, and checks if successor may be waiting
-     * in shared mode, if so propagating if either propagate > 0 or
-     * PROPAGATE status was set.
-     *
-     * @param node the node
-     * @param propagate the return value from a tryAcquireShared
-     */
-    private void setHeadAndPropagate(Node node, int propagate) {
-        Node h = head; // Record old head for check below
-        setHead(node);
-        /*
-         * Try to signal next queued node if:
-         *   Propagation was indicated by caller,
-         *     or was recorded (as h.waitStatus either before
-         *     or after setHead) by a previous operation
-         *     (note: this uses sign-check of waitStatus because
-         *      PROPAGATE status may transition to SIGNAL.)
-         * and
-         *   The next node is waiting in shared mode,
-         *     or we don't know, because it appears null
-         *
-         * The conservatism in both of these checks may cause
-         * unnecessary wake-ups, but only when there are multiple
-         * racing acquires/releases, so most need signals now or soon
-         * anyway.
-         */
-        if (propagate > 0 || h == null || h.waitStatus < 0 ||
-            (h = head) == null || h.waitStatus < 0) {
-            Node s = node.next;
-            if (s == null || s.isShared())
-                doReleaseShared();
-        }
-    }
-
-    // Utilities for various versions of acquire
-
-    /**
-     * Cancels an ongoing attempt to acquire.
-     *
-     * @param node the node
-     */
-    private void cancelAcquire(Node node) {
-        // Ignore if node doesn't exist
-        if (node == null)
-            return;
-
-        node.thread = null;
-
-        // Skip cancelled predecessors
-        Node pred = node.prev;
-        while (pred.waitStatus > 0)
-            node.prev = pred = pred.prev;
-
-        // predNext is the apparent node to unsplice. CASes below will
-        // fail if not, in which case, we lost race vs another cancel
-        // or signal, so no further action is necessary.
-        Node predNext = pred.next;
-
-        // Can use unconditional write instead of CAS here.
-        // After this atomic step, other Nodes can skip past us.
-        // Before, we are free of interference from other threads.
-        node.waitStatus = Node.CANCELLED;
-
-        // If we are the tail, remove ourselves.
-        if (node == tail && compareAndSetTail(node, pred)) {
-            compareAndSetNext(pred, predNext, null);
-        } else {
-            // If successor needs signal, try to set pred's next-link
-            // so it will get one. Otherwise wake it up to propagate.
-            int ws;
-            if (pred != head &&
-                ((ws = pred.waitStatus) == Node.SIGNAL ||
-                 (ws <= 0 && compareAndSetWaitStatus(pred, ws, Node.SIGNAL))) &&
-                pred.thread != null) {
-                Node next = node.next;
-                if (next != null && next.waitStatus <= 0)
-                    compareAndSetNext(pred, predNext, next);
-            } else {
-                unparkSuccessor(node);
-            }
-
-            node.next = node; // help GC
-        }
-    }
-
-    /**
-     * Checks and updates status for a node that failed to acquire.
-     * Returns true if thread should block. This is the main signal
-     * control in all acquire loops.  Requires that pred == node.prev.
-     *
-     * @param pred node's predecessor holding status
-     * @param node the node
-     * @return {@code true} if thread should block
-     */
-    private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
-        int ws = pred.waitStatus;
-        if (ws == Node.SIGNAL)
-            /*
-             * This node has already set status asking a release
-             * to signal it, so it can safely park.
-             */
-            return true;
-        if (ws > 0) {
-            /*
-             * Predecessor was cancelled. Skip over predecessors and
-             * indicate retry.
-             */
-            do {
-                node.prev = pred = pred.prev;
-            } while (pred.waitStatus > 0);
-            pred.next = node;
-        } else {
-            /*
-             * waitStatus must be 0 or PROPAGATE.  Indicate that we
-             * need a signal, but don't park yet.  Caller will need to
-             * retry to make sure it cannot acquire before parking.
-             */
-            compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
-        }
-        return false;
-    }
-
-    /**
-     * Convenience method to interrupt current thread.
-     */
-    static void selfInterrupt() {
-        Thread.currentThread().interrupt();
-    }
-
-    /**
-     * Convenience method to park and then check if interrupted
-     *
-     * @return {@code true} if interrupted
-     */
-    private final boolean parkAndCheckInterrupt() {
-        LockSupport.park(this);
-        return Thread.interrupted();
-    }
-
-    /*
-     * Various flavors of acquire, varying in exclusive/shared and
-     * control modes.  Each is mostly the same, but annoyingly
-     * different.  Only a little bit of factoring is possible due to
-     * interactions of exception mechanics (including ensuring that we
-     * cancel if tryAcquire throws exception) and other control, at
-     * least not without hurting performance too much.
-     */
-
-    /**
-     * Acquires in exclusive uninterruptible mode for thread already in
-     * queue. Used by condition wait methods as well as acquire.
-     *
-     * @param node the node
-     * @param arg the acquire argument
-     * @return {@code true} if interrupted while waiting
-     */
-    final boolean acquireQueued(final Node node, int arg) {
-        boolean failed = true;
-        try {
-            boolean interrupted = false;
-            for (;;) {
-                final Node p = node.predecessor();
-                if (p == head && tryAcquire(arg)) {
-                    setHead(node);
-                    p.next = null; // help GC
-                    failed = false;
-                    return interrupted;
-                }
-                if (shouldParkAfterFailedAcquire(p, node) &&
-                    parkAndCheckInterrupt())
-                    interrupted = true;
-            }
-        } finally {
-            if (failed)
-                cancelAcquire(node);
-        }
-    }
-
-    /**
-     * Acquires in exclusive interruptible mode.
-     * @param arg the acquire argument
-     */
-    private void doAcquireInterruptibly(int arg)
-        throws InterruptedException {
-        final Node node = addWaiter(Node.EXCLUSIVE);
-        boolean failed = true;
-        try {
-            for (;;) {
-                final Node p = node.predecessor();
-                if (p == head && tryAcquire(arg)) {
-                    setHead(node);
-                    p.next = null; // help GC
-                    failed = false;
-                    return;
-                }
-                if (shouldParkAfterFailedAcquire(p, node) &&
-                    parkAndCheckInterrupt())
-                    throw new InterruptedException();
-            }
-        } finally {
-            if (failed)
-                cancelAcquire(node);
-        }
-    }
-
-    /**
-     * Acquires in exclusive timed mode.
-     *
-     * @param arg the acquire argument
-     * @param nanosTimeout max wait time
-     * @return {@code true} if acquired
-     */
-    private boolean doAcquireNanos(int arg, long nanosTimeout)
-            throws InterruptedException {
-        if (nanosTimeout <= 0L)
-            return false;
-        final long deadline = System.nanoTime() + nanosTimeout;
-        final Node node = addWaiter(Node.EXCLUSIVE);
-        boolean failed = true;
-        try {
-            for (;;) {
-                final Node p = node.predecessor();
-                if (p == head && tryAcquire(arg)) {
-                    setHead(node);
-                    p.next = null; // help GC
-                    failed = false;
-                    return true;
-                }
-                nanosTimeout = deadline - System.nanoTime();
-                if (nanosTimeout <= 0L)
-                    return false;
-                if (shouldParkAfterFailedAcquire(p, node) &&
-                    nanosTimeout > spinForTimeoutThreshold)
-                    LockSupport.parkNanos(this, nanosTimeout);
-                if (Thread.interrupted())
-                    throw new InterruptedException();
-            }
-        } finally {
-            if (failed)
-                cancelAcquire(node);
-        }
-    }
-
-    /**
-     * Acquires in shared uninterruptible mode.
-     * @param arg the acquire argument
-     */
-    private void doAcquireShared(int arg) {
-        final Node node = addWaiter(Node.SHARED);
-        boolean failed = true;
-        try {
-            boolean interrupted = false;
-            for (;;) {
-                final Node p = node.predecessor();
-                if (p == head) {
-                    int r = tryAcquireShared(arg);
-                    if (r >= 0) {
-                        setHeadAndPropagate(node, r);
-                        p.next = null; // help GC
-                        if (interrupted)
-                            selfInterrupt();
-                        failed = false;
-                        return;
-                    }
-                }
-                if (shouldParkAfterFailedAcquire(p, node) &&
-                    parkAndCheckInterrupt())
-                    interrupted = true;
-            }
-        } finally {
-            if (failed)
-                cancelAcquire(node);
-        }
-    }
-
-    /**
-     * Acquires in shared interruptible mode.
-     * @param arg the acquire argument
-     */
-    private void doAcquireSharedInterruptibly(int arg)
-        throws InterruptedException {
-        final Node node = addWaiter(Node.SHARED);
-        boolean failed = true;
-        try {
-            for (;;) {
-                final Node p = node.predecessor();
-                if (p == head) {
-                    int r = tryAcquireShared(arg);
-                    if (r >= 0) {
-                        setHeadAndPropagate(node, r);
-                        p.next = null; // help GC
-                        failed = false;
-                        return;
-                    }
-                }
-                if (shouldParkAfterFailedAcquire(p, node) &&
-                    parkAndCheckInterrupt())
-                    throw new InterruptedException();
-            }
-        } finally {
-            if (failed)
-                cancelAcquire(node);
-        }
-    }
-
-    /**
-     * Acquires in shared timed mode.
-     *
-     * @param arg the acquire argument
-     * @param nanosTimeout max wait time
-     * @return {@code true} if acquired
-     */
-    private boolean doAcquireSharedNanos(int arg, long nanosTimeout)
-            throws InterruptedException {
-        if (nanosTimeout <= 0L)
-            return false;
-        final long deadline = System.nanoTime() + nanosTimeout;
-        final Node node = addWaiter(Node.SHARED);
-        boolean failed = true;
-        try {
-            for (;;) {
-                final Node p = node.predecessor();
-                if (p == head) {
-                    int r = tryAcquireShared(arg);
-                    if (r >= 0) {
-                        setHeadAndPropagate(node, r);
-                        p.next = null; // help GC
-                        failed = false;
-                        return true;
-                    }
-                }
-                nanosTimeout = deadline - System.nanoTime();
-                if (nanosTimeout <= 0L)
-                    return false;
-                if (shouldParkAfterFailedAcquire(p, node) &&
-                    nanosTimeout > spinForTimeoutThreshold)
-                    LockSupport.parkNanos(this, nanosTimeout);
-                if (Thread.interrupted())
-                    throw new InterruptedException();
-            }
-        } finally {
-            if (failed)
-                cancelAcquire(node);
-        }
-    }
-
-    // Main exported methods
-
-    /**
-     * Attempts to acquire in exclusive mode. This method should query
-     * if the state of the object permits it to be acquired in the
-     * exclusive mode, and if so to acquire it.
-     *
-     * <p>This method is always invoked by the thread performing
-     * acquire.  If this method reports failure, the acquire method
-     * may queue the thread, if it is not already queued, until it is
-     * signalled by a release from some other thread. This can be used
-     * to implement method {@link Lock#tryLock()}.
-     *
-     * <p>The default
-     * implementation throws {@link UnsupportedOperationException}.
-     *
-     * @param arg the acquire argument. This value is always the one
-     *        passed to an acquire method, or is the value saved on entry
-     *        to a condition wait.  The value is otherwise uninterpreted
-     *        and can represent anything you like.
-     * @return {@code true} if successful. Upon success, this object has
-     *         been acquired.
-     * @throws IllegalMonitorStateException if acquiring would place this
-     *         synchronizer in an illegal state. This exception must be
-     *         thrown in a consistent fashion for synchronization to work
-     *         correctly.
-     * @throws UnsupportedOperationException if exclusive mode is not supported
-     */
-    protected boolean tryAcquire(int arg) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Attempts to set the state to reflect a release in exclusive
-     * mode.
-     *
-     * <p>This method is always invoked by the thread performing release.
-     *
-     * <p>The default implementation throws
-     * {@link UnsupportedOperationException}.
-     *
-     * @param arg the release argument. This value is always the one
-     *        passed to a release method, or the current state value upon
-     *        entry to a condition wait.  The value is otherwise
-     *        uninterpreted and can represent anything you like.
-     * @return {@code true} if this object is now in a fully released
-     *         state, so that any waiting threads may attempt to acquire;
-     *         and {@code false} otherwise.
-     * @throws IllegalMonitorStateException if releasing would place this
-     *         synchronizer in an illegal state. This exception must be
-     *         thrown in a consistent fashion for synchronization to work
-     *         correctly.
-     * @throws UnsupportedOperationException if exclusive mode is not supported
-     */
-    protected boolean tryRelease(int arg) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Attempts to acquire in shared mode. This method should query if
-     * the state of the object permits it to be acquired in the shared
-     * mode, and if so to acquire it.
-     *
-     * <p>This method is always invoked by the thread performing
-     * acquire.  If this method reports failure, the acquire method
-     * may queue the thread, if it is not already queued, until it is
-     * signalled by a release from some other thread.
-     *
-     * <p>The default implementation throws {@link
-     * UnsupportedOperationException}.
-     *
-     * @param arg the acquire argument. This value is always the one
-     *        passed to an acquire method, or is the value saved on entry
-     *        to a condition wait.  The value is otherwise uninterpreted
-     *        and can represent anything you like.
-     * @return a negative value on failure; zero if acquisition in shared
-     *         mode succeeded but no subsequent shared-mode acquire can
-     *         succeed; and a positive value if acquisition in shared
-     *         mode succeeded and subsequent shared-mode acquires might
-     *         also succeed, in which case a subsequent waiting thread
-     *         must check availability. (Support for three different
-     *         return values enables this method to be used in contexts
-     *         where acquires only sometimes act exclusively.)  Upon
-     *         success, this object has been acquired.
-     * @throws IllegalMonitorStateException if acquiring would place this
-     *         synchronizer in an illegal state. This exception must be
-     *         thrown in a consistent fashion for synchronization to work
-     *         correctly.
-     * @throws UnsupportedOperationException if shared mode is not supported
-     */
-    protected int tryAcquireShared(int arg) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Attempts to set the state to reflect a release in shared mode.
-     *
-     * <p>This method is always invoked by the thread performing release.
-     *
-     * <p>The default implementation throws
-     * {@link UnsupportedOperationException}.
-     *
-     * @param arg the release argument. This value is always the one
-     *        passed to a release method, or the current state value upon
-     *        entry to a condition wait.  The value is otherwise
-     *        uninterpreted and can represent anything you like.
-     * @return {@code true} if this release of shared mode may permit a
-     *         waiting acquire (shared or exclusive) to succeed; and
-     *         {@code false} otherwise
-     * @throws IllegalMonitorStateException if releasing would place this
-     *         synchronizer in an illegal state. This exception must be
-     *         thrown in a consistent fashion for synchronization to work
-     *         correctly.
-     * @throws UnsupportedOperationException if shared mode is not supported
-     */
-    protected boolean tryReleaseShared(int arg) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Returns {@code true} if synchronization is held exclusively with
-     * respect to the current (calling) thread.  This method is invoked
-     * upon each call to a non-waiting {@link ConditionObject} method.
-     * (Waiting methods instead invoke {@link #release}.)
-     *
-     * <p>The default implementation throws {@link
-     * UnsupportedOperationException}. This method is invoked
-     * internally only within {@link ConditionObject} methods, so need
-     * not be defined if conditions are not used.
-     *
-     * @return {@code true} if synchronization is held exclusively;
-     *         {@code false} otherwise
-     * @throws UnsupportedOperationException if conditions are not supported
-     */
-    protected boolean isHeldExclusively() {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Acquires in exclusive mode, ignoring interrupts.  Implemented
-     * by invoking at least once {@link #tryAcquire},
-     * returning on success.  Otherwise the thread is queued, possibly
-     * repeatedly blocking and unblocking, invoking {@link
-     * #tryAcquire} until success.  This method can be used
-     * to implement method {@link Lock#lock}.
-     *
-     * @param arg the acquire argument.  This value is conveyed to
-     *        {@link #tryAcquire} but is otherwise uninterpreted and
-     *        can represent anything you like.
-     */
-    public final void acquire(int arg) {
-        if (!tryAcquire(arg) &&
-            acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
-            selfInterrupt();
-    }
-
-    /**
-     * Acquires in exclusive mode, aborting if interrupted.
-     * Implemented by first checking interrupt status, then invoking
-     * at least once {@link #tryAcquire}, returning on
-     * success.  Otherwise the thread is queued, possibly repeatedly
-     * blocking and unblocking, invoking {@link #tryAcquire}
-     * until success or the thread is interrupted.  This method can be
-     * used to implement method {@link Lock#lockInterruptibly}.
-     *
-     * @param arg the acquire argument.  This value is conveyed to
-     *        {@link #tryAcquire} but is otherwise uninterpreted and
-     *        can represent anything you like.
-     * @throws InterruptedException if the current thread is interrupted
-     */
-    public final void acquireInterruptibly(int arg)
-            throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        if (!tryAcquire(arg))
-            doAcquireInterruptibly(arg);
-    }
-
-    /**
-     * Attempts to acquire in exclusive mode, aborting if interrupted,
-     * and failing if the given timeout elapses.  Implemented by first
-     * checking interrupt status, then invoking at least once {@link
-     * #tryAcquire}, returning on success.  Otherwise, the thread is
-     * queued, possibly repeatedly blocking and unblocking, invoking
-     * {@link #tryAcquire} until success or the thread is interrupted
-     * or the timeout elapses.  This method can be used to implement
-     * method {@link Lock#tryLock(long, TimeUnit)}.
-     *
-     * @param arg the acquire argument.  This value is conveyed to
-     *        {@link #tryAcquire} but is otherwise uninterpreted and
-     *        can represent anything you like.
-     * @param nanosTimeout the maximum number of nanoseconds to wait
-     * @return {@code true} if acquired; {@code false} if timed out
-     * @throws InterruptedException if the current thread is interrupted
-     */
-    public final boolean tryAcquireNanos(int arg, long nanosTimeout)
-            throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        return tryAcquire(arg) ||
-            doAcquireNanos(arg, nanosTimeout);
-    }
-
-    /**
-     * Releases in exclusive mode.  Implemented by unblocking one or
-     * more threads if {@link #tryRelease} returns true.
-     * This method can be used to implement method {@link Lock#unlock}.
-     *
-     * @param arg the release argument.  This value is conveyed to
-     *        {@link #tryRelease} but is otherwise uninterpreted and
-     *        can represent anything you like.
-     * @return the value returned from {@link #tryRelease}
-     */
-    public final boolean release(int arg) {
-        if (tryRelease(arg)) {
-            Node h = head;
-            if (h != null && h.waitStatus != 0)
-                unparkSuccessor(h);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Acquires in shared mode, ignoring interrupts.  Implemented by
-     * first invoking at least once {@link #tryAcquireShared},
-     * returning on success.  Otherwise the thread is queued, possibly
-     * repeatedly blocking and unblocking, invoking {@link
-     * #tryAcquireShared} until success.
-     *
-     * @param arg the acquire argument.  This value is conveyed to
-     *        {@link #tryAcquireShared} but is otherwise uninterpreted
-     *        and can represent anything you like.
-     */
-    public final void acquireShared(int arg) {
-        if (tryAcquireShared(arg) < 0)
-            doAcquireShared(arg);
-    }
-
-    /**
-     * Acquires in shared mode, aborting if interrupted.  Implemented
-     * by first checking interrupt status, then invoking at least once
-     * {@link #tryAcquireShared}, returning on success.  Otherwise the
-     * thread is queued, possibly repeatedly blocking and unblocking,
-     * invoking {@link #tryAcquireShared} until success or the thread
-     * is interrupted.
-     * @param arg the acquire argument.
-     * This value is conveyed to {@link #tryAcquireShared} but is
-     * otherwise uninterpreted and can represent anything
-     * you like.
-     * @throws InterruptedException if the current thread is interrupted
-     */
-    public final void acquireSharedInterruptibly(int arg)
-            throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        if (tryAcquireShared(arg) < 0)
-            doAcquireSharedInterruptibly(arg);
-    }
-
-    /**
-     * Attempts to acquire in shared mode, aborting if interrupted, and
-     * failing if the given timeout elapses.  Implemented by first
-     * checking interrupt status, then invoking at least once {@link
-     * #tryAcquireShared}, returning on success.  Otherwise, the
-     * thread is queued, possibly repeatedly blocking and unblocking,
-     * invoking {@link #tryAcquireShared} until success or the thread
-     * is interrupted or the timeout elapses.
-     *
-     * @param arg the acquire argument.  This value is conveyed to
-     *        {@link #tryAcquireShared} but is otherwise uninterpreted
-     *        and can represent anything you like.
-     * @param nanosTimeout the maximum number of nanoseconds to wait
-     * @return {@code true} if acquired; {@code false} if timed out
-     * @throws InterruptedException if the current thread is interrupted
-     */
-    public final boolean tryAcquireSharedNanos(int arg, long nanosTimeout)
-            throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        return tryAcquireShared(arg) >= 0 ||
-            doAcquireSharedNanos(arg, nanosTimeout);
-    }
-
-    /**
-     * Releases in shared mode.  Implemented by unblocking one or more
-     * threads if {@link #tryReleaseShared} returns true.
-     *
-     * @param arg the release argument.  This value is conveyed to
-     *        {@link #tryReleaseShared} but is otherwise uninterpreted
-     *        and can represent anything you like.
-     * @return the value returned from {@link #tryReleaseShared}
-     */
-    public final boolean releaseShared(int arg) {
-        if (tryReleaseShared(arg)) {
-            doReleaseShared();
-            return true;
-        }
-        return false;
-    }
-
-    // Queue inspection methods
-
-    /**
-     * Queries whether any threads are waiting to acquire. Note that
-     * because cancellations due to interrupts and timeouts may occur
-     * at any time, a {@code true} return does not guarantee that any
-     * other thread will ever acquire.
-     *
-     * <p>In this implementation, this operation returns in
-     * constant time.
-     *
-     * @return {@code true} if there may be other threads waiting to acquire
-     */
-    public final boolean hasQueuedThreads() {
-        return head != tail;
-    }
-
-    /**
-     * Queries whether any threads have ever contended to acquire this
-     * synchronizer; that is if an acquire method has ever blocked.
-     *
-     * <p>In this implementation, this operation returns in
-     * constant time.
-     *
-     * @return {@code true} if there has ever been contention
-     */
-    public final boolean hasContended() {
-        return head != null;
-    }
-
-    /**
-     * Returns the first (longest-waiting) thread in the queue, or
-     * {@code null} if no threads are currently queued.
-     *
-     * <p>In this implementation, this operation normally returns in
-     * constant time, but may iterate upon contention if other threads are
-     * concurrently modifying the queue.
-     *
-     * @return the first (longest-waiting) thread in the queue, or
-     *         {@code null} if no threads are currently queued
-     */
-    public final Thread getFirstQueuedThread() {
-        // handle only fast path, else relay
-        return (head == tail) ? null : fullGetFirstQueuedThread();
-    }
-
-    /**
-     * Version of getFirstQueuedThread called when fastpath fails
-     */
-    private Thread fullGetFirstQueuedThread() {
-        /*
-         * The first node is normally head.next. Try to get its
-         * thread field, ensuring consistent reads: If thread
-         * field is nulled out or s.prev is no longer head, then
-         * some other thread(s) concurrently performed setHead in
-         * between some of our reads. We try this twice before
-         * resorting to traversal.
-         */
-        Node h, s;
-        Thread st;
-        if (((h = head) != null && (s = h.next) != null &&
-             s.prev == head && (st = s.thread) != null) ||
-            ((h = head) != null && (s = h.next) != null &&
-             s.prev == head && (st = s.thread) != null))
-            return st;
-
-        /*
-         * Head's next field might not have been set yet, or may have
-         * been unset after setHead. So we must check to see if tail
-         * is actually first node. If not, we continue on, safely
-         * traversing from tail back to head to find first,
-         * guaranteeing termination.
-         */
-
-        Node t = tail;
-        Thread firstThread = null;
-        while (t != null && t != head) {
-            Thread tt = t.thread;
-            if (tt != null)
-                firstThread = tt;
-            t = t.prev;
-        }
-        return firstThread;
-    }
-
-    /**
-     * Returns true if the given thread is currently queued.
-     *
-     * <p>This implementation traverses the queue to determine
-     * presence of the given thread.
-     *
-     * @param thread the thread
-     * @return {@code true} if the given thread is on the queue
-     * @throws NullPointerException if the thread is null
-     */
-    public final boolean isQueued(Thread thread) {
-        if (thread == null)
-            throw new NullPointerException();
-        for (Node p = tail; p != null; p = p.prev)
-            if (p.thread == thread)
-                return true;
-        return false;
-    }
-
-    /**
-     * Returns {@code true} if the apparent first queued thread, if one
-     * exists, is waiting in exclusive mode.  If this method returns
-     * {@code true}, and the current thread is attempting to acquire in
-     * shared mode (that is, this method is invoked from {@link
-     * #tryAcquireShared}) then it is guaranteed that the current thread
-     * is not the first queued thread.  Used only as a heuristic in
-     * ReentrantReadWriteLock.
-     */
-    final boolean apparentlyFirstQueuedIsExclusive() {
-        Node h, s;
-        return (h = head) != null &&
-            (s = h.next)  != null &&
-            !s.isShared()         &&
-            s.thread != null;
-    }
-
-    /**
-     * Queries whether any threads have been waiting to acquire longer
-     * than the current thread.
-     *
-     * <p>An invocation of this method is equivalent to (but may be
-     * more efficient than):
-     *  <pre> {@code
-     * getFirstQueuedThread() != Thread.currentThread() &&
-     * hasQueuedThreads()}</pre>
-     *
-     * <p>Note that because cancellations due to interrupts and
-     * timeouts may occur at any time, a {@code true} return does not
-     * guarantee that some other thread will acquire before the current
-     * thread.  Likewise, it is possible for another thread to win a
-     * race to enqueue after this method has returned {@code false},
-     * due to the queue being empty.
-     *
-     * <p>This method is designed to be used by a fair synchronizer to
-     * avoid <a href="AbstractQueuedSynchronizer#barging">barging</a>.
-     * Such a synchronizer's {@link #tryAcquire} method should return
-     * {@code false}, and its {@link #tryAcquireShared} method should
-     * return a negative value, if this method returns {@code true}
-     * (unless this is a reentrant acquire).  For example, the {@code
-     * tryAcquire} method for a fair, reentrant, exclusive mode
-     * synchronizer might look like this:
-     *
-     *  <pre> {@code
-     * protected boolean tryAcquire(int arg) {
-     *   if (isHeldExclusively()) {
-     *     // A reentrant acquire; increment hold count
-     *     return true;
-     *   } else if (hasQueuedPredecessors()) {
-     *     return false;
-     *   } else {
-     *     // try to acquire normally
-     *   }
-     * }}</pre>
-     *
-     * @return {@code true} if there is a queued thread preceding the
-     *         current thread, and {@code false} if the current thread
-     *         is at the head of the queue or the queue is empty
-     * @since 1.7
-     */
-    public final boolean hasQueuedPredecessors() {
-        // The correctness of this depends on head being initialized
-        // before tail and on head.next being accurate if the current
-        // thread is first in queue.
-        Node t = tail; // Read fields in reverse initialization order
-        Node h = head;
-        Node s;
-        return h != t &&
-            ((s = h.next) == null || s.thread != Thread.currentThread());
-    }
-
-
-    // Instrumentation and monitoring methods
-
-    /**
-     * Returns an estimate of the number of threads waiting to
-     * acquire.  The value is only an estimate because the number of
-     * threads may change dynamically while this method traverses
-     * internal data structures.  This method is designed for use in
-     * monitoring system state, not for synchronization
-     * control.
-     *
-     * @return the estimated number of threads waiting to acquire
-     */
-    public final int getQueueLength() {
-        int n = 0;
-        for (Node p = tail; p != null; p = p.prev) {
-            if (p.thread != null)
-                ++n;
-        }
-        return n;
-    }
-
-    /**
-     * Returns a collection containing threads that may be waiting to
-     * acquire.  Because the actual set of threads may change
-     * dynamically while constructing this result, the returned
-     * collection is only a best-effort estimate.  The elements of the
-     * returned collection are in no particular order.  This method is
-     * designed to facilitate construction of subclasses that provide
-     * more extensive monitoring facilities.
-     *
-     * @return the collection of threads
-     */
-    public final Collection<Thread> getQueuedThreads() {
-        ArrayList<Thread> list = new ArrayList<Thread>();
-        for (Node p = tail; p != null; p = p.prev) {
-            Thread t = p.thread;
-            if (t != null)
-                list.add(t);
-        }
-        return list;
-    }
-
-    /**
-     * Returns a collection containing threads that may be waiting to
-     * acquire in exclusive mode. This has the same properties
-     * as {@link #getQueuedThreads} except that it only returns
-     * those threads waiting due to an exclusive acquire.
-     *
-     * @return the collection of threads
-     */
-    public final Collection<Thread> getExclusiveQueuedThreads() {
-        ArrayList<Thread> list = new ArrayList<Thread>();
-        for (Node p = tail; p != null; p = p.prev) {
-            if (!p.isShared()) {
-                Thread t = p.thread;
-                if (t != null)
-                    list.add(t);
-            }
-        }
-        return list;
-    }
-
-    /**
-     * Returns a collection containing threads that may be waiting to
-     * acquire in shared mode. This has the same properties
-     * as {@link #getQueuedThreads} except that it only returns
-     * those threads waiting due to a shared acquire.
-     *
-     * @return the collection of threads
-     */
-    public final Collection<Thread> getSharedQueuedThreads() {
-        ArrayList<Thread> list = new ArrayList<Thread>();
-        for (Node p = tail; p != null; p = p.prev) {
-            if (p.isShared()) {
-                Thread t = p.thread;
-                if (t != null)
-                    list.add(t);
-            }
-        }
-        return list;
-    }
-
-    /**
-     * Returns a string identifying this synchronizer, as well as its state.
-     * The state, in brackets, includes the String {@code "State ="}
-     * followed by the current value of {@link #getState}, and either
-     * {@code "nonempty"} or {@code "empty"} depending on whether the
-     * queue is empty.
-     *
-     * @return a string identifying this synchronizer, as well as its state
-     */
-    public String toString() {
-        int s = getState();
-        String q  = hasQueuedThreads() ? "non" : "";
-        return super.toString() +
-            "[State = " + s + ", " + q + "empty queue]";
-    }
-
-
-    // Internal support methods for Conditions
-
-    /**
-     * Returns true if a node, always one that was initially placed on
-     * a condition queue, is now waiting to reacquire on sync queue.
-     * @param node the node
-     * @return true if is reacquiring
-     */
-    final boolean isOnSyncQueue(Node node) {
-        if (node.waitStatus == Node.CONDITION || node.prev == null)
-            return false;
-        if (node.next != null) // If has successor, it must be on queue
-            return true;
-        /*
-         * node.prev can be non-null, but not yet on queue because
-         * the CAS to place it on queue can fail. So we have to
-         * traverse from tail to make sure it actually made it.  It
-         * will always be near the tail in calls to this method, and
-         * unless the CAS failed (which is unlikely), it will be
-         * there, so we hardly ever traverse much.
-         */
-        return findNodeFromTail(node);
-    }
-
-    /**
-     * Returns true if node is on sync queue by searching backwards from tail.
-     * Called only when needed by isOnSyncQueue.
-     * @return true if present
-     */
-    private boolean findNodeFromTail(Node node) {
-        Node t = tail;
-        for (;;) {
-            if (t == node)
-                return true;
-            if (t == null)
-                return false;
-            t = t.prev;
-        }
-    }
-
-    /**
-     * Transfers a node from a condition queue onto sync queue.
-     * Returns true if successful.
-     * @param node the node
-     * @return true if successfully transferred (else the node was
-     * cancelled before signal)
-     */
-    final boolean transferForSignal(Node node) {
-        /*
-         * If cannot change waitStatus, the node has been cancelled.
-         */
-        if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
-            return false;
-
-        /*
-         * Splice onto queue and try to set waitStatus of predecessor to
-         * indicate that thread is (probably) waiting. If cancelled or
-         * attempt to set waitStatus fails, wake up to resync (in which
-         * case the waitStatus can be transiently and harmlessly wrong).
-         */
-        Node p = enq(node);
-        int ws = p.waitStatus;
-        if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
-            LockSupport.unpark(node.thread);
-        return true;
-    }
-
-    /**
-     * Transfers node, if necessary, to sync queue after a cancelled wait.
-     * Returns true if thread was cancelled before being signalled.
-     *
-     * @param node the node
-     * @return true if cancelled before the node was signalled
-     */
-    final boolean transferAfterCancelledWait(Node node) {
-        if (compareAndSetWaitStatus(node, Node.CONDITION, 0)) {
-            enq(node);
-            return true;
-        }
-        /*
-         * If we lost out to a signal(), then we can't proceed
-         * until it finishes its enq().  Cancelling during an
-         * incomplete transfer is both rare and transient, so just
-         * spin.
-         */
-        while (!isOnSyncQueue(node))
-            Thread.yield();
-        return false;
-    }
-
-    /**
-     * Invokes release with current state value; returns saved state.
-     * Cancels node and throws exception on failure.
-     * @param node the condition node for this wait
-     * @return previous sync state
-     */
-    final int fullyRelease(Node node) {
-        boolean failed = true;
-        try {
-            int savedState = getState();
-            if (release(savedState)) {
-                failed = false;
-                return savedState;
-            } else {
-                throw new IllegalMonitorStateException();
-            }
-        } finally {
-            if (failed)
-                node.waitStatus = Node.CANCELLED;
-        }
-    }
-
-    // Instrumentation methods for conditions
-
-    /**
-     * Queries whether the given ConditionObject
-     * uses this synchronizer as its lock.
-     *
-     * @param condition the condition
-     * @return {@code true} if owned
-     * @throws NullPointerException if the condition is null
-     */
-    public final boolean owns(ConditionObject condition) {
-        return condition.isOwnedBy(this);
-    }
-
-    /**
-     * Queries whether any threads are waiting on the given condition
-     * associated with this synchronizer. Note that because timeouts
-     * and interrupts may occur at any time, a {@code true} return
-     * does not guarantee that a future {@code signal} will awaken
-     * any threads.  This method is designed primarily for use in
-     * monitoring of the system state.
-     *
-     * @param condition the condition
-     * @return {@code true} if there are any waiting threads
-     * @throws IllegalMonitorStateException if exclusive synchronization
-     *         is not held
-     * @throws IllegalArgumentException if the given condition is
-     *         not associated with this synchronizer
-     * @throws NullPointerException if the condition is null
-     */
-    public final boolean hasWaiters(ConditionObject condition) {
-        if (!owns(condition))
-            throw new IllegalArgumentException("Not owner");
-        return condition.hasWaiters();
-    }
-
-    /**
-     * Returns an estimate of the number of threads waiting on the
-     * given condition associated with this synchronizer. Note that
-     * because timeouts and interrupts may occur at any time, the
-     * estimate serves only as an upper bound on the actual number of
-     * waiters.  This method is designed for use in monitoring of the
-     * system state, not for synchronization control.
-     *
-     * @param condition the condition
-     * @return the estimated number of waiting threads
-     * @throws IllegalMonitorStateException if exclusive synchronization
-     *         is not held
-     * @throws IllegalArgumentException if the given condition is
-     *         not associated with this synchronizer
-     * @throws NullPointerException if the condition is null
-     */
-    public final int getWaitQueueLength(ConditionObject condition) {
-        if (!owns(condition))
-            throw new IllegalArgumentException("Not owner");
-        return condition.getWaitQueueLength();
-    }
-
-    /**
-     * Returns a collection containing those threads that may be
-     * waiting on the given condition associated with this
-     * synchronizer.  Because the actual set of threads may change
-     * dynamically while constructing this result, the returned
-     * collection is only a best-effort estimate. The elements of the
-     * returned collection are in no particular order.
-     *
-     * @param condition the condition
-     * @return the collection of threads
-     * @throws IllegalMonitorStateException if exclusive synchronization
-     *         is not held
-     * @throws IllegalArgumentException if the given condition is
-     *         not associated with this synchronizer
-     * @throws NullPointerException if the condition is null
-     */
-    public final Collection<Thread> getWaitingThreads(ConditionObject condition) {
-        if (!owns(condition))
-            throw new IllegalArgumentException("Not owner");
-        return condition.getWaitingThreads();
     }
 
     /**
@@ -1827,22 +2060,40 @@ public abstract class AbstractQueuedSynchronizer
      * <p>This class is Serializable, but all fields are transient,
      * so deserialized conditions have no waiters.
      */
+    // {同步条件}对象，用于更精细地指导线程的同步行为
     public class ConditionObject implements Condition, java.io.Serializable {
         private static final long serialVersionUID = 1173984872572414699L;
-        /** First node of condition queue. */
+        /**
+         * Mode meaning to reinterrupt on exit from wait
+         */
+        // 刚刚唤醒的线程带有中断标记，且该线程node仍在【|条件队列|】，此时需要为线程恢复中断标记
+        private static final int REINTERRUPT = 1;
+        /**
+         * Mode meaning to throw InterruptedException on exit from wait
+         */
+        // 刚刚唤醒的线程带有中断标记，且该线程node已进入了【|同步队列|】，此时需要抛出异常
+        private static final int THROW_IE = -1;
+        /**
+         * First node of condition queue.
+         */
+        // 【|条件队列|】以单链表形式组织，firstWaiter和lastWaiter是首尾结点，不存在头结点
         private transient Node firstWaiter;
-        /** Last node of condition queue. */
+
+        // Internal methods
+        /**
+         * Last node of condition queue.
+         */
         private transient Node lastWaiter;
 
         /**
          * Creates a new {@code ConditionObject} instance.
          */
-        public ConditionObject() { }
-
-        // Internal methods
+        public ConditionObject() {
+        }
 
         /**
          * Adds a new waiter to wait queue.
+         *
          * @return its new wait node
          */
         private Node addConditionWaiter() {
@@ -1865,19 +2116,23 @@ public abstract class AbstractQueuedSynchronizer
          * Removes and transfers nodes until hit non-cancelled one or
          * null. Split out from signal in part to encourage compilers
          * to inline the case of no waiters.
+         *
          * @param first (non-null) the first node on condition queue
          */
         private void doSignal(Node first) {
             do {
-                if ( (firstWaiter = first.nextWaiter) == null)
+                if ((firstWaiter = first.nextWaiter) == null)
                     lastWaiter = null;
                 first.nextWaiter = null;
             } while (!transferForSignal(first) &&
-                     (first = firstWaiter) != null);
+                    (first = firstWaiter) != null);
         }
+
+        // public methods
 
         /**
          * Removes and transfers all nodes.
+         *
          * @param first (non-null) the first node on condition queue
          */
         private void doSignalAll(Node first) {
@@ -1917,14 +2172,11 @@ public abstract class AbstractQueuedSynchronizer
                         trail.nextWaiter = next;
                     if (next == null)
                         lastWaiter = trail;
-                }
-                else
+                } else
                     trail = t;
                 t = next;
             }
         }
-
-        // public methods
 
         /**
          * Moves the longest-waiting thread, if one exists, from the
@@ -1932,7 +2184,7 @@ public abstract class AbstractQueuedSynchronizer
          * owning lock.
          *
          * @throws IllegalMonitorStateException if {@link #isHeldExclusively}
-         *         returns {@code false}
+         *                                      returns {@code false}
          */
         public final void signal() {
             if (!isHeldExclusively())
@@ -1942,12 +2194,19 @@ public abstract class AbstractQueuedSynchronizer
                 doSignal(first);
         }
 
+        /*
+         * For interruptible waits, we need to track whether to throw
+         * InterruptedException, if interrupted while blocked on
+         * condition, versus reinterrupt current thread, if
+         * interrupted while blocked waiting to re-acquire.
+         */
+
         /**
          * Moves all threads from the wait queue for this condition to
          * the wait queue for the owning lock.
          *
          * @throws IllegalMonitorStateException if {@link #isHeldExclusively}
-         *         returns {@code false}
+         *                                      returns {@code false}
          */
         public final void signalAll() {
             if (!isHeldExclusively())
@@ -1981,18 +2240,6 @@ public abstract class AbstractQueuedSynchronizer
                 selfInterrupt();
         }
 
-        /*
-         * For interruptible waits, we need to track whether to throw
-         * InterruptedException, if interrupted while blocked on
-         * condition, versus reinterrupt current thread, if
-         * interrupted while blocked waiting to re-acquire.
-         */
-
-        /** Mode meaning to reinterrupt on exit from wait */
-        private static final int REINTERRUPT =  1;
-        /** Mode meaning to throw InterruptedException on exit from wait */
-        private static final int THROW_IE    = -1;
-
         /**
          * Checks for interrupt, returning THROW_IE if interrupted
          * before signalled, REINTERRUPT if after signalled, or
@@ -2000,8 +2247,8 @@ public abstract class AbstractQueuedSynchronizer
          */
         private int checkInterruptWhileWaiting(Node node) {
             return Thread.interrupted() ?
-                (transferAfterCancelledWait(node) ? THROW_IE : REINTERRUPT) :
-                0;
+                    (transferAfterCancelledWait(node) ? THROW_IE : REINTERRUPT) :
+                    0;
         }
 
         /**
@@ -2009,7 +2256,7 @@ public abstract class AbstractQueuedSynchronizer
          * does nothing, depending on mode.
          */
         private void reportInterruptAfterWait(int interruptMode)
-            throws InterruptedException {
+                throws InterruptedException {
             if (interruptMode == THROW_IE)
                 throw new InterruptedException();
             else if (interruptMode == REINTERRUPT)
@@ -2029,23 +2276,53 @@ public abstract class AbstractQueuedSynchronizer
          * <li> If interrupted while blocked in step 4, throw InterruptedException.
          * </ol>
          */
+        /*
+         * 使当前活跃的线程暂时陷入阻塞，进入【|条件队列|】排队，并唤醒【|同步队列|】中的等待者...
+         * 直到收到signal()命令，该线程才恢复运行
+         *
+         * 禁止阻塞带有中断标记的线程
+         *
+         * 操作步骤：
+         * 1.将该线程的引用封装到{条件node}中，并进入【|条件队列|】排队
+         * 2.释放掉该线程持有的全部许可证，即让锁重新处于可用状态
+         * 3.唤醒【|同步队列|】中的等待者重新争锁
+         * 4.将自身陷入阻塞，等待signal()唤醒
+         * 5.被signal()唤醒后，将排队的{条件node}移入【|同步队列|】，
+         *   并恢复其许可证，让其继续执行...
+         */
         public final void await() throws InterruptedException {
-            if (Thread.interrupted())
+            // 如果线程带有中断标记，则抛出异常
+            if (Thread.interrupted()){
                 throw new InterruptedException();
+            }
+            // 添加一个新的【条件节点】（缓存了当前线程的引用）到条件队列，并返回刚添加node
             Node node = addConditionWaiter();
+            // 丢弃node所在线程持有的所有许可证，并唤醒同步队列的后续阻塞线程
             int savedState = fullyRelease(node);
             int interruptMode = 0;
+            // 判断node是否位于同步队列中等待重新获取锁
             while (!isOnSyncQueue(node)) {
+                // 如果节点位于条件队列，则暂停运行，陷入阻塞
                 LockSupport.park(this);
+                // 被signal()唤醒后，node 成为同步队列的首个节点，并准备去抢锁
+                // 唤醒阻塞线程后，首先检查其当前是否有中断标记，如果有直接跳出循环
                 if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
                     break;
             }
+            /*
+             * 之前被阻塞的线程现在已经可以去争锁了
+             * 而且，争锁时会携带之前保存的许可证数量
+             * 争锁成功后，该结点会成为【|同步队列|】的头结点，并恢复运行
+             */
             if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
                 interruptMode = REINTERRUPT;
             if (node.nextWaiter != null) // clean up if cancelled
                 unlinkCancelledWaiters();
-            if (interruptMode != 0)
+            // 有中断标记的情况下
+            if(interruptMode != 0) {
+                // 对刚刚唤醒的带有中断标记的线程进行特殊处理
                 reportInterruptAfterWait(interruptMode);
+            }
         }
 
         /**
@@ -2192,7 +2469,7 @@ public abstract class AbstractQueuedSynchronizer
          *
          * @return {@code true} if there are any waiting threads
          * @throws IllegalMonitorStateException if {@link #isHeldExclusively}
-         *         returns {@code false}
+         *                                      returns {@code false}
          */
         protected final boolean hasWaiters() {
             if (!isHeldExclusively())
@@ -2211,7 +2488,7 @@ public abstract class AbstractQueuedSynchronizer
          *
          * @return the estimated number of waiting threads
          * @throws IllegalMonitorStateException if {@link #isHeldExclusively}
-         *         returns {@code false}
+         *                                      returns {@code false}
          */
         protected final int getWaitQueueLength() {
             if (!isHeldExclusively())
@@ -2231,7 +2508,7 @@ public abstract class AbstractQueuedSynchronizer
          *
          * @return the collection of threads
          * @throws IllegalMonitorStateException if {@link #isHeldExclusively}
-         *         returns {@code false}
+         *                                      returns {@code false}
          */
         protected final Collection<Thread> getWaitingThreads() {
             if (!isHeldExclusively())
@@ -2246,70 +2523,5 @@ public abstract class AbstractQueuedSynchronizer
             }
             return list;
         }
-    }
-
-    /**
-     * Setup to support compareAndSet. We need to natively implement
-     * this here: For the sake of permitting future enhancements, we
-     * cannot explicitly subclass AtomicInteger, which would be
-     * efficient and useful otherwise. So, as the lesser of evils, we
-     * natively implement using hotspot intrinsics API. And while we
-     * are at it, we do the same for other CASable fields (which could
-     * otherwise be done with atomic field updaters).
-     */
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
-    private static final long stateOffset;
-    private static final long headOffset;
-    private static final long tailOffset;
-    private static final long waitStatusOffset;
-    private static final long nextOffset;
-
-    static {
-        try {
-            stateOffset = unsafe.objectFieldOffset
-                (AbstractQueuedSynchronizer.class.getDeclaredField("state"));
-            headOffset = unsafe.objectFieldOffset
-                (AbstractQueuedSynchronizer.class.getDeclaredField("head"));
-            tailOffset = unsafe.objectFieldOffset
-                (AbstractQueuedSynchronizer.class.getDeclaredField("tail"));
-            waitStatusOffset = unsafe.objectFieldOffset
-                (Node.class.getDeclaredField("waitStatus"));
-            nextOffset = unsafe.objectFieldOffset
-                (Node.class.getDeclaredField("next"));
-
-        } catch (Exception ex) { throw new Error(ex); }
-    }
-
-    /**
-     * CAS head field. Used only by enq.
-     */
-    private final boolean compareAndSetHead(Node update) {
-        return unsafe.compareAndSwapObject(this, headOffset, null, update);
-    }
-
-    /**
-     * CAS tail field. Used only by enq.
-     */
-    private final boolean compareAndSetTail(Node expect, Node update) {
-        return unsafe.compareAndSwapObject(this, tailOffset, expect, update);
-    }
-
-    /**
-     * CAS waitStatus field of a node.
-     */
-    private static final boolean compareAndSetWaitStatus(Node node,
-                                                         int expect,
-                                                         int update) {
-        return unsafe.compareAndSwapInt(node, waitStatusOffset,
-                                        expect, update);
-    }
-
-    /**
-     * CAS next field of a node.
-     */
-    private static final boolean compareAndSetNext(Node node,
-                                                   Node expect,
-                                                   Node update) {
-        return unsafe.compareAndSwapObject(node, nextOffset, expect, update);
     }
 }
