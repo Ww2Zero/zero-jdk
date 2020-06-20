@@ -5,23 +5,22 @@ import com.zero.test.util.ThreadUtil;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Producer implements Runnable {
 
-    private Lock lock;
-    private Condition condition;
-    private Lock emptyLock;
+    private ReentrantLock fullLock;
+    private Condition fullCon;
+    private ReentrantLock emptyLock;
     private Condition emptyCon;
     private AtomicInteger inventory;
     private int maxInventory;
 
-    public Producer(AtomicInteger inventory, int max, Lock lock, Condition condition, ReentrantLock emptyLock, Condition emptyCon) {
+    public Producer(AtomicInteger inventory, int max, ReentrantLock fullLock, Condition fullCon, ReentrantLock emptyLock, Condition emptyCon) {
         this.inventory = inventory;
         this.maxInventory = max;
-        this.lock = lock;
-        this.condition = condition;
+        this.fullLock = fullLock;
+        this.fullCon = fullCon;
         this.emptyCon = emptyCon;
         this.emptyLock = emptyLock;
     }
@@ -37,20 +36,22 @@ public class Producer implements Runnable {
     }
 
     public void produce(String e) {
-        lock.lock();
+
         try {
+            fullLock.lock();
             while (inventory.get() == maxInventory) {
-                condition.await();
+                System.out.println("fullLock.getHoldCount() = " + fullLock.getHoldCount());
+                System.out.println("fullLock.getQueueLength() = " + fullLock.getQueueLength());
+                fullCon.await();
             }
             System.out.println("放⼊⼀个商品库存，总库存为：" + inventory.incrementAndGet());
-            condition.signalAll();
         } catch (Exception ex) {
             ex.printStackTrace();
         } finally {
-            lock.unlock();
+            fullLock.unlock();
         }
 
-        if (inventory.get() > 0) {
+        if (inventory.get() == maxInventory) {
             try {
                 emptyLock.lockInterruptibly();
                 emptyCon.signalAll();

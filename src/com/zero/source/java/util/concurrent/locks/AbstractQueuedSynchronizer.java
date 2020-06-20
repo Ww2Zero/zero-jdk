@@ -704,7 +704,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         // Skip cancelled predecessors
         Node pred = node.prev;
         // 顺着node的前驱向前遍历，将标记为取消的node结点连成一片
-        while (pred.waitStatus > 0){
+        while (pred.waitStatus > 0) {
             node.prev = pred = pred.prev;
         }
 
@@ -833,9 +833,9 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
                 // 获取node结点的前驱
                 final Node p = node.predecessor();
                 // 如果node结点目前排在了队首，则node线程有权利申请锁
-                if(p == head) {
+                if (p == head) {
                     // 尝试申请锁
-                    if(tryAcquire(arg)){
+                    if (tryAcquire(arg)) {
                         // 设置node为头结点（即丢掉了原来的头结点）
                         setHead(node);
                         // 切断旧的头结点与后一个结点的联系，以便GC
@@ -844,9 +844,9 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
                     }
                 }
                 // 抢锁失败时，尝试为node的前驱设置阻塞标记（每个结点的阻塞标记设置在其前驱上）
-                if(shouldParkAfterFailedAcquire(p, node)) {
+                if (shouldParkAfterFailedAcquire(p, node)) {
                     // 设置当前线程进入阻塞状态，并清除当前线程的中断状态
-                    if(parkAndCheckInterrupt()){
+                    if (parkAndCheckInterrupt()) {
                         // 如果线程被唤醒时拥有中断标记（在阻塞期间设置的），这里抛出异常
                         throw new InterruptedException();
                     }
@@ -1191,7 +1191,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     public final void acquireInterruptibly(int arg)
             throws InterruptedException {
         // 测试当前线程是否已经中断，线程的中断状态会被清除
-        if(Thread.interrupted()) {
+        if (Thread.interrupted()) {
             // 如果当前线程有中断标记，则抛出异常
             throw new InterruptedException();
         }
@@ -1241,7 +1241,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         if (tryRelease(arg)) {
             //  /* 如果锁已经处于自由状态，则可以唤醒下一个阻塞的线程了 */
             Node h = head;
-            if (h != null && h.waitStatus != 0){
+            if (h != null && h.waitStatus != 0) {
                 // 唤醒h后面陷入阻塞的“后继”
                 unparkSuccessor(h);
             }
@@ -1620,6 +1620,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
      * @param node the node
      * @return true if is reacquiring
      */
+    // 判断指定节点是否在等待队列中
     final boolean isOnSyncQueue(Node node) {
         if (node.waitStatus == Node.CONDITION || node.prev == null)
             return false;
@@ -1642,6 +1643,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
      *
      * @return true if present
      */
+    // 从后向前搜索指定节点
     private boolean findNodeFromTail(Node node) {
         Node t = tail;
         for (; ; ) {
@@ -1661,12 +1663,16 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
      * @return true if successfully transferred (else the node was
      * cancelled before signal)
      */
+    // 尝试将node状态码更新为0，并追加到【|同步队列|】，并为其前驱设置Node.SIGNAL标记（很重要的一步）
     final boolean transferForSignal(Node node) {
         /*
          * If cannot change waitStatus, the node has been cancelled.
          */
-        if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
+        // 首先尝试将node的状态码更新为0
+        if (!compareAndSetWaitStatus(node, Node.CONDITION, 0)) {
             return false;
+        }
+
 
         /*
          * Splice onto queue and try to set waitStatus of predecessor to
@@ -1674,10 +1680,14 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * attempt to set waitStatus fails, wake up to resync (in which
          * case the waitStatus can be transiently and harmlessly wrong).
          */
+        // 使用尾插法将node添加到【|同步队列|】，并返回旧的队尾
         Node p = enq(node);
         int ws = p.waitStatus;
-        if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+        if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL)) {
+            // 唤醒node的指定线程
             LockSupport.unpark(node.thread);
+        }
+
         return true;
     }
 
@@ -1688,8 +1698,11 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
      * @param node the node
      * @return true if cancelled before the node was signalled
      */
+    // 尝试将【|条件队列|】中的node状态码更新为0，并追加到【|同步队列|】
     final boolean transferAfterCancelledWait(Node node) {
+        // 更新状态码为0
         if (compareAndSetWaitStatus(node, Node.CONDITION, 0)) {
+            // 使用尾插法将node添加到【|同步队列|】
             enq(node);
             return true;
         }
@@ -1699,8 +1712,12 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * incomplete transfer is both rare and transient, so just
          * spin.
          */
-        while (!isOnSyncQueue(node))
+        // 判断node是否正位于同步队列中等待重新获取锁
+        while (!isOnSyncQueue(node)) {
+            // 当前线程让出CPU时间片，大家重新抢占执行权
             Thread.yield();
+        }
+
         return false;
     }
 
@@ -1711,12 +1728,16 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
      * @param node the condition node for this wait
      * @return previous sync state
      */
+    // 针对独占锁，丢弃node所在线程持有的所有许可证，并唤醒【|同步队列|】后续的阻塞线程
     final int fullyRelease(Node node) {
         boolean failed = true;
         try {
+            // 获取当前线程持有的所有许可证
             int savedState = getState();
+            // 尝试完全释放锁，并唤醒后续的阻塞线程。返回值表示本次操作后锁是否自由
             if (release(savedState)) {
                 failed = false;
+                // 返回释放前的许可证数量
                 return savedState;
             } else {
                 throw new IllegalMonitorStateException();
@@ -2096,6 +2117,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          *
          * @return its new wait node
          */
+        // 添加新的节点到等待队列队尾，并返回该新的节点
         private Node addConditionWaiter() {
             Node t = lastWaiter;
             // If lastWaiter is cancelled, clean out.
@@ -2119,13 +2141,20 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          *
          * @param first (non-null) the first node on condition queue
          */
+        // 将【|条件队列|】中的首结点追加到【|同步队列|】中，并让其处于待唤醒状态
         private void doSignal(Node first) {
             do {
-                if ((firstWaiter = first.nextWaiter) == null)
+                // 从【|条件队列|】中删除首结点
+                if ((firstWaiter = first.nextWaiter) == null) {
                     lastWaiter = null;
+                }
+                // 切断首结点与后续结点的关联
                 first.nextWaiter = null;
-            } while (!transferForSignal(first) &&
-                    (first = firstWaiter) != null);
+                /*
+                 * 尝试将node状态码更新为0，并追加到【|同步队列|】，并为其前驱设置Node.SIGNAL标记
+                 * 如果更新状态码时就失败了，需要摘取【|条件队列|】的下一个结点继续尝试
+                 */
+            } while (!transferForSignal(first) && (first = firstWaiter) != null);
         }
 
         // public methods
@@ -2159,6 +2188,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * without requiring many re-traversals during cancellation
          * storms.
          */
+        // 从【|条件队列|】中移除已取消的等待者
         private void unlinkCancelledWaiters() {
             Node t = firstWaiter;
             Node trail = null;
@@ -2186,12 +2216,16 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * @throws IllegalMonitorStateException if {@link #isHeldExclusively}
          *                                      returns {@code false}
          */
+        // 将【|条件队列|】中的首结点追加到【|同步队列|】中，并让其处于待唤醒状态
         public final void signal() {
-            if (!isHeldExclusively())
+            // 如果当前线程不是锁的占用者，抛出异常
+            if (!isHeldExclusively()) {
                 throw new IllegalMonitorStateException();
+            }
             Node first = firstWaiter;
-            if (first != null)
+            if (first != null) {
                 doSignal(first);
+            }
         }
 
         /*
@@ -2227,17 +2261,44 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          *      {@link #acquire} with saved state as argument.
          * </ol>
          */
+        /*
+         * 使当前活跃的线程暂时陷入阻塞，进入【|条件队列|】排队，并唤醒【|同步队列|】中的等待者...
+         * 直到收到signal()命令，该线程才恢复运行
+         *
+         * 允许阻塞带有中断标记的线程
+         */
         public final void awaitUninterruptibly() {
+            // 添加一个新的[条件Node](缓存了当前线程的引用)到【|条件队列|】，并返回刚添加的node
             Node node = addConditionWaiter();
+            /*
+             * 针对独占锁，丢弃node所在线程持有的所有许可证（数量由savedState保存），并唤醒【|同步队列|】后续的阻塞线程
+             * 这样一来，同步队列中排在首位的线程又可以开始抢锁了
+             */
             int savedState = fullyRelease(node);
             boolean interrupted = false;
+            // 判断node是否正位于【|同步队列|】中等待重新获取锁
             while (!isOnSyncQueue(node)) {
+                // 如果结点位于【|条件队列|】，则暂停运行，陷入阻塞
                 LockSupport.park(this);
-                if (Thread.interrupted())
+                /* 从这里被signal()唤醒后，node已成为【|同步队列|】的首个结点（不是头结点），并准备去抢锁 */
+
+                // 唤醒阻塞线程后，首先检查（并清除）其当前是否有中断标记，如果有的话用interrupted记下来
+                if (Thread.interrupted()) {
                     interrupted = true;
+                }
+
             }
-            if (acquireQueued(node, savedState) || interrupted)
+            /*
+             * 之前被阻塞的线程现在已经可以去争锁了
+             * 而且，争锁时会携带之前保存的许可证数量
+             * 争锁成功后，该结点会成为【|同步队列|】的头结点，并恢复运行
+             *
+             * 在争锁成功时需要为当前线程设置中断标记
+             */
+            if (acquireQueued(node, savedState) || interrupted) {
+                // 设置当前线程的中断状态
                 selfInterrupt();
+            }
         }
 
         /**
@@ -2292,7 +2353,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          */
         public final void await() throws InterruptedException {
             // 如果线程带有中断标记，则抛出异常
-            if (Thread.interrupted()){
+            if (Thread.interrupted()) {
                 throw new InterruptedException();
             }
             // 添加一个新的【条件节点】（缓存了当前线程的引用）到条件队列，并返回刚添加node
@@ -2319,7 +2380,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
             if (node.nextWaiter != null) // clean up if cancelled
                 unlinkCancelledWaiters();
             // 有中断标记的情况下
-            if(interruptMode != 0) {
+            if (interruptMode != 0) {
                 // 对刚刚唤醒的带有中断标记的线程进行特殊处理
                 reportInterruptAfterWait(interruptMode);
             }
@@ -2338,31 +2399,73 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * <li> If interrupted while blocked in step 4, throw InterruptedException.
          * </ol>
          */
+        /*
+         * 使当前活跃的线程暂时陷入阻塞，进入【|条件队列|】排队，并唤醒【|同步队列|】中的等待者...
+         * 直到收到signal()的信号，或超时醒来，该线程才恢复运行
+         *
+         * 禁止阻塞带有中断标记的线程
+         *
+         * nanosTimeout是相对时间，代表最长阻塞时间，过了这个时间，即使没有收到signal()的信号，也会自己醒来
+         */
         public final long awaitNanos(long nanosTimeout)
                 throws InterruptedException {
-            if (Thread.interrupted())
+            // 如果线程带有中断标记，则抛出异常
+            if (Thread.interrupted()) {
                 throw new InterruptedException();
+            }
+            // 添加一个新的[条件Node]到【|条件队列|】，并返回刚添加的node
             Node node = addConditionWaiter();
+            /*
+             * 针对独占锁，丢弃node所在线程持有的所有许可证（数量由savedState保存），并唤醒【|同步队列|】后续的阻塞线程
+             * 这样一来，同步队列中排在首位的线程又可以开始抢锁了
+             */
             int savedState = fullyRelease(node);
+            // 计算结束时间
             final long deadline = System.nanoTime() + nanosTimeout;
             int interruptMode = 0;
+            // 判断node是否正位于【|同步队列|】中等待重新获取锁
             while (!isOnSyncQueue(node)) {
+                // 已经超时
                 if (nanosTimeout <= 0L) {
+                    // 立即将【|条件队列|】中的node状态码更新为0，并追加到【|同步队列|】
                     transferAfterCancelledWait(node);
                     break;
                 }
-                if (nanosTimeout >= spinForTimeoutThreshold)
+                // 如果时间过短，就不阻塞了，一直循环，直到超时
+                if (nanosTimeout >= spinForTimeoutThreshold) {
+                    // 使线程阻塞nanosTimeout（单位：纳秒）时长后自动醒来（中途可被唤醒）
                     LockSupport.parkNanos(this, nanosTimeout);
-                if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
+                }
+                /*
+                 * 从这里被signal()唤醒后，node已成为【|同步队列|】的首个结点（不是头结点），
+                 * 此时while循环就进不来了，该线程可以去抢锁了
+                 *
+                 * 当然，这里也有可能是超时后自然醒来的
+                 * 如果该线程是超时后自己醒来的，则会将自身追加到【|同步队列|】并跳出循环
+                 */
+                // 线程醒来后，首先检查其当前是否有中断标记，如果有的话直接跳出循环
+                if ((interruptMode = checkInterruptWhileWaiting(node)) != 0) {
                     break;
+                }
+                // 判断是否超时（因为可能是半道被唤醒的）
                 nanosTimeout = deadline - System.nanoTime();
             }
-            if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
+            /*
+             * 之前被阻塞的线程现在已经可以去争锁了
+             * 而且，争锁时会携带之前保存的许可证数量
+             * 争锁成功后，该结点会成为【|同步队列|】的头结点，并恢复运行
+             */
+            if (acquireQueued(node, savedState) && interruptMode != THROW_IE) {
                 interruptMode = REINTERRUPT;
-            if (node.nextWaiter != null)
+            }
+            if (node.nextWaiter != null) {
                 unlinkCancelledWaiters();
-            if (interruptMode != 0)
+            }
+            // 有中断标记的情况下
+            if (interruptMode != 0) {
+                // 对刚刚醒来的带有中断标记的线程进行特殊处理
                 reportInterruptAfterWait(interruptMode);
+            }
             return deadline - System.nanoTime();
         }
 
@@ -2379,6 +2482,14 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * <li> If interrupted while blocked in step 4, throw InterruptedException.
          * <li> If timed out while blocked in step 4, return false, else true.
          * </ol>
+         */
+        /*
+         * 使当前活跃的线程暂时陷入阻塞，进入【|条件队列|】排队，并唤醒【|同步队列|】中的等待者...
+         * 直到收到signal()的信号，或超时醒来，该线程才恢复运行
+         *
+         * 禁止阻塞带有中断标记的线程
+         *
+         * deadline是绝对时间，代表阻塞截止时间，过了这个时间，即使没有收到signal()的信号，也会自己醒来
          */
         public final boolean awaitUntil(Date deadline)
                 throws InterruptedException {
@@ -2421,6 +2532,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * <li> If timed out while blocked in step 4, return false, else true.
          * </ol>
          */
+        // 与awaitNanos(long)方法作用一致，只不过纳秒时间由time转换而来
         public final boolean await(long time, TimeUnit unit)
                 throws InterruptedException {
             long nanosTimeout = unit.toNanos(time);
@@ -2490,6 +2602,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * @throws IllegalMonitorStateException if {@link #isHeldExclusively}
          *                                      returns {@code false}
          */
+        //  返回【|条件队列|】长度
         protected final int getWaitQueueLength() {
             if (!isHeldExclusively())
                 throw new IllegalMonitorStateException();

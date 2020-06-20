@@ -5,23 +5,22 @@ import com.zero.test.util.ThreadUtil;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Customer implements Runnable {
-    private Lock lock;
-    private Condition condition;
-    private Lock fullLock;
+    private ReentrantLock emptyLock;
+    private Condition emptyCon;
+    private ReentrantLock fullLock;
     private Condition fullCon;
 
     private AtomicInteger inventory;
     private int maxInventory;
 
 
-    public Customer(AtomicInteger inventory, int max, Lock lock, Condition condition, ReentrantLock fullLock, Condition fullCon) {
+    public Customer(AtomicInteger inventory, int max, ReentrantLock emptyLock, Condition emptyCon, ReentrantLock fullLock, Condition fullCon) {
         this.inventory = inventory;
-        this.lock = lock;
-        this.condition = condition;
+        this.emptyLock = emptyLock;
+        this.emptyCon = emptyCon;
         this.fullCon = fullCon;
         this.fullLock = fullLock;
         this.maxInventory = max;
@@ -37,23 +36,26 @@ public class Customer implements Runnable {
     }
 
     public void consume() {
-        lock.lock();
+
         try {
+            emptyLock.lock();
             while (inventory.get() == 0) {
-                condition.await();
+                System.out.println("emptyLock.getHoldCount() = " + emptyLock.getHoldCount());
+                System.out.println("emptyLock.getQueueLength() = " + emptyLock.getQueueLength());
+                emptyCon.await();
             }
             System.out.println("去除⼀个商品库存，总库存为：" + inventory.decrementAndGet());
-            condition.signalAll();
         } catch (Exception ex) {
             ex.printStackTrace();
         } finally {
-            lock.unlock();
+            emptyLock.unlock();
         }
 
         if (inventory.get() == 0) {
             try {
                 fullLock.lockInterruptibly();
                 fullCon.signalAll();
+
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {

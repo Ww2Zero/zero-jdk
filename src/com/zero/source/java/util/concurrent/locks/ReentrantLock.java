@@ -145,7 +145,6 @@ public class ReentrantLock implements Lock, java.io.Serializable {
     /**
      * Sync object for fair locks
      */
-    //
 
     /**
      * Acquires the lock.
@@ -474,6 +473,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * @return {@code true} if any thread holds this lock and
      * {@code false} otherwise
      */
+    // 判断是否持有锁
     public boolean isLocked() {
         return sync.isLocked();
     }
@@ -483,6 +483,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      *
      * @return {@code true} if this lock has fairness set true
      */
+    // 判断是否是公平锁
     public final boolean isFair() {
         return sync instanceof FairSync;
     }
@@ -500,6 +501,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      *
      * @return the owner, or {@code null} if not owned
      */
+    // 获取当前锁持有的线程
     protected Thread getOwner() {
         return sync.getOwner();
     }
@@ -514,6 +516,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * @return {@code true} if there may be other threads waiting to
      * acquire the lock
      */
+    // 判断是否有线程等待申请锁
     public final boolean hasQueuedThreads() {
         return sync.hasQueuedThreads();
     }
@@ -529,6 +532,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * @return {@code true} if the given thread is queued waiting for this lock
      * @throws NullPointerException if the thread is null
      */
+    // 判断指定线程是否在等待队列中
     public final boolean hasQueuedThread(Thread thread) {
         return sync.isQueued(thread);
     }
@@ -543,6 +547,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      *
      * @return the estimated number of threads waiting for this lock
      */
+    // 获取等待队列的长度
     public final int getQueueLength() {
         return sync.getQueueLength();
     }
@@ -558,6 +563,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      *
      * @return the collection of threads
      */
+    // 获取等待队列中所有线程的集合
     protected Collection<Thread> getQueuedThreads() {
         return sync.getQueuedThreads();
     }
