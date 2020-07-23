@@ -37,7 +37,7 @@
 8) HashSet 1
 9) LinkedHashMap 1
 10) LinkedHashSet 1
-11) TreeMap 1
+11) TreeMap 1 --
 12) TreeSet 1
 13) Vector 2
 14) Queue 2
@@ -45,7 +45,7 @@
 16) SortedMap 2
 17) SortedSet 2
 18) Collections 3
-19) Arrays 3
+19) Arrays 3 --
 20) Comparator 3
 21) Iterator 3
 22) Base64 4
