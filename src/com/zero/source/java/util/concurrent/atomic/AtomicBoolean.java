@@ -47,12 +47,16 @@ import sun.misc.Unsafe;
  * @since 1.5
  * @author Doug Lea
  */
+// 布尔类型 (原子性)
 public class AtomicBoolean implements java.io.Serializable {
     private static final long serialVersionUID = 4654671469794556979L;
     // setup to use Unsafe.compareAndSwapInt for updates
     private static final Unsafe unsafe = Unsafe.getUnsafe();
+    // 实际存储的值 1表示true 0表示false
+    private volatile int value;
+    // value的偏移量
     private static final long valueOffset;
-
+    // 初始化时获value的偏移量，后续便于CAS比较设置值
     static {
         try {
             valueOffset = unsafe.objectFieldOffset
@@ -60,13 +64,14 @@ public class AtomicBoolean implements java.io.Serializable {
         } catch (Exception ex) { throw new Error(ex); }
     }
 
-    private volatile int value;
+
 
     /**
      * Creates a new {@code AtomicBoolean} with the given initial value.
      *
      * @param initialValue the initial value
      */
+    // 根据给定的boolean值构造原子变量
     public AtomicBoolean(boolean initialValue) {
         value = initialValue ? 1 : 0;
     }
@@ -74,6 +79,7 @@ public class AtomicBoolean implements java.io.Serializable {
     /**
      * Creates a new {@code AtomicBoolean} with initial value {@code false}.
      */
+    // 无参数的构造函数 默认初始化为false
     public AtomicBoolean() {
     }
 
@@ -82,6 +88,7 @@ public class AtomicBoolean implements java.io.Serializable {
      *
      * @return the current value
      */
+    // 返回当前的boolean值
     public final boolean get() {
         return value != 0;
     }
@@ -95,6 +102,7 @@ public class AtomicBoolean implements java.io.Serializable {
      * @return {@code true} if successful. False return indicates that
      * the actual value was not equal to the expected value.
      */
+    // 如果当前值为expect，则将其原子地更新为update，返回值表示是否更新成功
     public final boolean compareAndSet(boolean expect, boolean update) {
         int e = expect ? 1 : 0;
         int u = update ? 1 : 0;
@@ -113,6 +121,7 @@ public class AtomicBoolean implements java.io.Serializable {
      * @param update the new value
      * @return {@code true} if successful
      */
+    // 如果当前值为expect，则将其原子地更新为update，返回值表示是否更新成功
     public boolean weakCompareAndSet(boolean expect, boolean update) {
         int e = expect ? 1 : 0;
         int u = update ? 1 : 0;
@@ -124,6 +133,7 @@ public class AtomicBoolean implements java.io.Serializable {
      *
      * @param newValue the new value
      */
+    // 设置当前原子值为给定的值
     public final void set(boolean newValue) {
         value = newValue ? 1 : 0;
     }
@@ -134,6 +144,7 @@ public class AtomicBoolean implements java.io.Serializable {
      * @param newValue the new value
      * @since 1.6
      */
+    // 最终？设置当前原子值为给定的值
     public final void lazySet(boolean newValue) {
         int v = newValue ? 1 : 0;
         unsafe.putOrderedInt(this, valueOffset, v);
@@ -145,6 +156,7 @@ public class AtomicBoolean implements java.io.Serializable {
      * @param newValue the new value
      * @return the previous value
      */
+    // 获取当前值并将当前对象修改为给定的newValue的值
     public final boolean getAndSet(boolean newValue) {
         boolean prev;
         do {
