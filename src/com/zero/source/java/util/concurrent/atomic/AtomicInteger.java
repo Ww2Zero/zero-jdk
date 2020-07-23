@@ -51,6 +51,7 @@ import sun.misc.Unsafe;
  * @since 1.5
  * @author Doug Lea
 */
+// Integer类型（原子性）
 public class AtomicInteger extends Number implements java.io.Serializable {
     private static final long serialVersionUID = 6214790243416807050L;
 
@@ -72,6 +73,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      *
      * @param initialValue the initial value
      */
+    // 根据给定的值构造原子变量
     public AtomicInteger(int initialValue) {
         value = initialValue;
     }
@@ -79,6 +81,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
     /**
      * Creates a new AtomicInteger with initial value {@code 0}.
      */
+    // 构造原子变量，其值初始化为0
     public AtomicInteger() {
     }
 
@@ -87,6 +90,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      *
      * @return the current value
      */
+    // 获取原子变量的值
     public final int get() {
         return value;
     }
@@ -96,6 +100,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      *
      * @param newValue the new value
      */
+    // 设置原子变量的值
     public final void set(int newValue) {
         value = newValue;
     }
@@ -106,6 +111,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @param newValue the new value
      * @since 1.6
      */
+    // lazySet不会立刻(但是最终会)修改旧值，别的线程看到新值的时间会延迟一些
     public final void lazySet(int newValue) {
         unsafe.putOrderedInt(this, valueOffset, newValue);
     }
@@ -116,6 +122,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @param newValue the new value
      * @return the previous value
      */
+    // 获取原子变量的值并将原子变量设置为给定的值newValue
     public final int getAndSet(int newValue) {
         return unsafe.getAndSetInt(this, valueOffset, newValue);
     }
@@ -129,6 +136,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @return {@code true} if successful. False return indicates that
      * the actual value was not equal to the expected value.
      */
+    // 比较原子变量是否等于 expect，若相等则将原子变量更新为update，返回是否更新成功
     public final boolean compareAndSet(int expect, int update) {
         return unsafe.compareAndSwapInt(this, valueOffset, expect, update);
     }
@@ -145,6 +153,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @param update the new value
      * @return {@code true} if successful
      */
+    //
     public final boolean weakCompareAndSet(int expect, int update) {
         return unsafe.compareAndSwapInt(this, valueOffset, expect, update);
     }
@@ -154,6 +163,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      *
      * @return the previous value
      */
+    // 获取原子变量的值，并将原子变量的值加1
     public final int getAndIncrement() {
         return unsafe.getAndAddInt(this, valueOffset, 1);
     }
@@ -163,6 +173,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      *
      * @return the previous value
      */
+    // 获取原子变量的值，并将原子变量的值减1
     public final int getAndDecrement() {
         return unsafe.getAndAddInt(this, valueOffset, -1);
     }
@@ -173,6 +184,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @param delta the value to add
      * @return the previous value
      */
+    // 获取原子变量的值，并将原子变量的值加给定的值delta
     public final int getAndAdd(int delta) {
         return unsafe.getAndAddInt(this, valueOffset, delta);
     }
@@ -182,6 +194,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      *
      * @return the updated value
      */
+    // 给原子的值加1，然后返回加1之后的值
     public final int incrementAndGet() {
         return unsafe.getAndAddInt(this, valueOffset, 1) + 1;
     }
@@ -191,6 +204,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      *
      * @return the updated value
      */
+    // 给原子变量减1，然后返回减1之后的值
     public final int decrementAndGet() {
         return unsafe.getAndAddInt(this, valueOffset, -1) - 1;
     }
@@ -201,6 +215,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @param delta the value to add
      * @return the updated value
      */
+    // 给原子变量加给定的delta，然后返回加delta之后的值
     public final int addAndGet(int delta) {
         return unsafe.getAndAddInt(this, valueOffset, delta) + delta;
     }
@@ -215,6 +230,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @return the previous value
      * @since 1.8
      */
+    // 获取原子变量的值，并更新原子变量的值为给定function的返回值
     public final int getAndUpdate(IntUnaryOperator updateFunction) {
         int prev, next;
         do {
@@ -234,6 +250,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @return the updated value
      * @since 1.8
      */
+    // 更新原子变量为给定function的返回值，获取更新之后的值
     public final int updateAndGet(IntUnaryOperator updateFunction) {
         int prev, next;
         do {
@@ -257,6 +274,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @return the previous value
      * @since 1.8
      */
+    // 获取原子变量的值，并执行累加函数然后更新原子变量的值
     public final int getAndAccumulate(int x,
                                       IntBinaryOperator accumulatorFunction) {
         int prev, next;
@@ -281,6 +299,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @return the updated value
      * @since 1.8
      */
+    // 更新原子变量为累加函数的计算结果，在获取更新之后的值
     public final int accumulateAndGet(int x,
                                       IntBinaryOperator accumulatorFunction) {
         int prev, next;
@@ -302,6 +321,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
     /**
      * Returns the value of this {@code AtomicInteger} as an {@code int}.
      */
+    // 获取原子变量的值
     public int intValue() {
         return get();
     }
@@ -311,6 +331,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * after a widening primitive conversion.
      * @jls 5.1.2 Widening Primitive Conversions
      */
+    // 获取原子变量的long类型的值
     public long longValue() {
         return (long)get();
     }
@@ -320,6 +341,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * after a widening primitive conversion.
      * @jls 5.1.2 Widening Primitive Conversions
      */
+    // 获取原子变量float类型的值
     public float floatValue() {
         return (float)get();
     }
@@ -329,6 +351,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * after a widening primitive conversion.
      * @jls 5.1.2 Widening Primitive Conversions
      */
+    // 获取原子变量double类型的值
     public double doubleValue() {
         return (double)get();
     }
