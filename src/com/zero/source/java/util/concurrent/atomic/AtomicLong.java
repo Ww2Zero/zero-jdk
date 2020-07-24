@@ -51,6 +51,7 @@ import sun.misc.Unsafe;
  * @since 1.5
  * @author Doug Lea
  */
+// long类型 (原子性)
 public class AtomicLong extends Number implements java.io.Serializable {
     private static final long serialVersionUID = 1927816293512124184L;
 
@@ -64,6 +65,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * method works in either case, some constructions should be
      * handled at Java level to avoid locking user-visible locks.
      */
+    // 记录JVM是否支持long的无锁compareAndSet
     static final boolean VM_SUPPORTS_LONG_CAS = VMSupportsCS8();
 
     /**
@@ -78,7 +80,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
                 (AtomicLong.class.getDeclaredField("value"));
         } catch (Exception ex) { throw new Error(ex); }
     }
-
+    // 实际存储值
     private volatile long value;
 
     /**
@@ -86,6 +88,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      *
      * @param initialValue the initial value
      */
+    // 给定指定的值 initialValue 构造原子变量
     public AtomicLong(long initialValue) {
         value = initialValue;
     }
@@ -93,6 +96,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
     /**
      * Creates a new AtomicLong with initial value {@code 0}.
      */
+    // 构造原子变量，其值初始化为0
     public AtomicLong() {
     }
 
@@ -101,6 +105,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      *
      * @return the current value
      */
+    // 返回原子变量的值
     public final long get() {
         return value;
     }
@@ -110,6 +115,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      *
      * @param newValue the new value
      */
+    // 设置原子变量的值
     public final void set(long newValue) {
         value = newValue;
     }
@@ -120,6 +126,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @param newValue the new value
      * @since 1.6
      */
+    // 懒设置原子变量的值  (最终设置)
     public final void lazySet(long newValue) {
         unsafe.putOrderedLong(this, valueOffset, newValue);
     }
@@ -130,6 +137,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @param newValue the new value
      * @return the previous value
      */
+    // 获取原子变量的值并设置原子变量为给定的newValue的值
     public final long getAndSet(long newValue) {
         return unsafe.getAndSetLong(this, valueOffset, newValue);
     }
@@ -143,6 +151,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @return {@code true} if successful. False return indicates that
      * the actual value was not equal to the expected value.
      */
+    // 原子的比较原子变量的值是否与expect相等，相等则更新原子变量为update
     public final boolean compareAndSet(long expect, long update) {
         return unsafe.compareAndSwapLong(this, valueOffset, expect, update);
     }
@@ -168,6 +177,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      *
      * @return the previous value
      */
+    // 获取原子变量的值，并将原子变量的值加一
     public final long getAndIncrement() {
         return unsafe.getAndAddLong(this, valueOffset, 1L);
     }
@@ -177,6 +187,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      *
      * @return the previous value
      */
+    // 获取原子变量的值，并将原子变量的值减一
     public final long getAndDecrement() {
         return unsafe.getAndAddLong(this, valueOffset, -1L);
     }
@@ -187,6 +198,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @param delta the value to add
      * @return the previous value
      */
+    // 获取原子变量的值，并将原子变量的值加delta
     public final long getAndAdd(long delta) {
         return unsafe.getAndAddLong(this, valueOffset, delta);
     }
@@ -196,6 +208,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      *
      * @return the updated value
      */
+    // 增加原子变量的值，并获取原子变量的值
     public final long incrementAndGet() {
         return unsafe.getAndAddLong(this, valueOffset, 1L) + 1L;
     }
@@ -205,6 +218,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      *
      * @return the updated value
      */
+    // 减少原子变量的值，并获取原子变量的值
     public final long decrementAndGet() {
         return unsafe.getAndAddLong(this, valueOffset, -1L) - 1L;
     }
@@ -215,6 +229,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @param delta the value to add
      * @return the updated value
      */
+    // 增加原子变量指定的值delta，并获取原子变量的值
     public final long addAndGet(long delta) {
         return unsafe.getAndAddLong(this, valueOffset, delta) + delta;
     }
@@ -229,6 +244,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @return the previous value
      * @since 1.8
      */
+    // 获取原子变量的值，并更新原子变量为function的执行结果
     public final long getAndUpdate(LongUnaryOperator updateFunction) {
         long prev, next;
         do {
@@ -248,6 +264,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @return the updated value
      * @since 1.8
      */
+    // 更新原子变量为function的执行结果，并获取原子变量的值
     public final long updateAndGet(LongUnaryOperator updateFunction) {
         long prev, next;
         do {
@@ -271,6 +288,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @return the previous value
      * @since 1.8
      */
+     // 获取原子变量的值，并更新原子变量的值为执行累加函数的值
     public final long getAndAccumulate(long x,
                                        LongBinaryOperator accumulatorFunction) {
         long prev, next;
@@ -295,6 +313,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * @return the updated value
      * @since 1.8
      */
+    // 更新原子变量的值为执行累加函数的值，并获取原子变量的值
     public final long accumulateAndGet(long x,
                                        LongBinaryOperator accumulatorFunction) {
         long prev, next;
