@@ -1,5 +1,7 @@
 package com.zero.test.util;
 
+import java.util.Objects;
+
 public class Assert {
 
     private Assert() {
@@ -13,6 +15,12 @@ public class Assert {
 
     public static void isFalse(boolean b) {
         if (b) {
+            throw new RuntimeException("check error");
+        }
+    }
+
+    public static void isEquals(Object a, Object b) {
+        if (!Objects.equals(a, b)) {
             throw new RuntimeException("check error");
         }
     }
