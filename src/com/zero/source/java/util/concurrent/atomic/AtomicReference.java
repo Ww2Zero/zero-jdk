@@ -46,6 +46,8 @@ import sun.misc.Unsafe;
  * @author Doug Lea
  * @param <V> The type of object referred to by this reference
  */
+// 引用类型 (原子性)
+// 可能存在A->B->A问题
 public class AtomicReference<V> implements java.io.Serializable {
     private static final long serialVersionUID = -1848883965231344442L;
 
@@ -58,7 +60,7 @@ public class AtomicReference<V> implements java.io.Serializable {
                 (AtomicReference.class.getDeclaredField("value"));
         } catch (Exception ex) { throw new Error(ex); }
     }
-
+    // 存放引用类型的变量
     private volatile V value;
 
     /**
@@ -66,6 +68,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      *
      * @param initialValue the initial value
      */
+    // 根据给定的对象构造原子引用类型
     public AtomicReference(V initialValue) {
         value = initialValue;
     }
@@ -73,6 +76,7 @@ public class AtomicReference<V> implements java.io.Serializable {
     /**
      * Creates a new AtomicReference with null initial value.
      */
+    // 创建空的原子引用类型
     public AtomicReference() {
     }
 
@@ -81,6 +85,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      *
      * @return the current value
      */
+    // 获取原子引用类型的当前值
     public final V get() {
         return value;
     }
@@ -90,6 +95,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      *
      * @param newValue the new value
      */
+    // 设置原子引用类型的值
     public final void set(V newValue) {
         value = newValue;
     }
@@ -100,6 +106,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @param newValue the new value
      * @since 1.6
      */
+    // 最终设置原子引用类型的值 懒设置
     public final void lazySet(V newValue) {
         unsafe.putOrderedObject(this, valueOffset, newValue);
     }
@@ -112,6 +119,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @return {@code true} if successful. False return indicates that
      * the actual value was not equal to the expected value.
      */
+    // 先比较原子引用类型的值是否与expect相等，若相等则修改原子应用类型为update
     public final boolean compareAndSet(V expect, V update) {
         return unsafe.compareAndSwapObject(this, valueOffset, expect, update);
     }
@@ -128,6 +136,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @param update the new value
      * @return {@code true} if successful
      */
+    // 先比较原子引用类型的值是否与expect相等，若相等则修改原子应用类型为update
     public final boolean weakCompareAndSet(V expect, V update) {
         return unsafe.compareAndSwapObject(this, valueOffset, expect, update);
     }
@@ -138,6 +147,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @param newValue the new value
      * @return the previous value
      */
+    // 先获取原子引用类型的值，然后设置原子引用类型的值为newValue
     @SuppressWarnings("unchecked")
     public final V getAndSet(V newValue) {
         return (V)unsafe.getAndSetObject(this, valueOffset, newValue);
@@ -153,6 +163,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @return the previous value
      * @since 1.8
      */
+    // 先获取原子引用类型的值，然后将原子应用类型的值修改为function的结果
     public final V getAndUpdate(UnaryOperator<V> updateFunction) {
         V prev, next;
         do {
@@ -172,6 +183,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @return the updated value
      * @since 1.8
      */
+    // 先将原子引用类型的值修改为function的执行结果，然后获取原子引用类型的值
     public final V updateAndGet(UnaryOperator<V> updateFunction) {
         V prev, next;
         do {
@@ -195,6 +207,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @return the previous value
      * @since 1.8
      */
+    // 先获取原子引用类的值，然后将原子引用类型的值修改为累加function的执行结果
     public final V getAndAccumulate(V x,
                                     BinaryOperator<V> accumulatorFunction) {
         V prev, next;
@@ -219,6 +232,7 @@ public class AtomicReference<V> implements java.io.Serializable {
      * @return the updated value
      * @since 1.8
      */
+    // 先将原子引用类型的值修改为累加function的执行结果，然后获取原子引用类的值
     public final V accumulateAndGet(V x,
                                     BinaryOperator<V> accumulatorFunction) {
         V prev, next;
