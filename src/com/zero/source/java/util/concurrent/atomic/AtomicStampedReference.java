@@ -47,8 +47,10 @@ package java.util.concurrent.atomic;
  * @author Doug Lea
  * @param <V> The type of object referred to by this reference
  */
+// 捆绑了int标记的reference，在特定场合下可以解决CAS中的ABA问题
 public class AtomicStampedReference<V> {
 
+    // 绑定 reference和int为一对
     private static class Pair<T> {
         final T reference;
         final int stamp;
@@ -60,7 +62,7 @@ public class AtomicStampedReference<V> {
             return new Pair<T>(reference, stamp);
         }
     }
-
+    // 实际存储引用的变量
     private volatile Pair<V> pair;
 
     /**
@@ -70,6 +72,7 @@ public class AtomicStampedReference<V> {
      * @param initialRef the initial reference
      * @param initialStamp the initial stamp
      */
+    // 给定引用变量和初始int戳构建原子引用变量
     public AtomicStampedReference(V initialRef, int initialStamp) {
         pair = Pair.of(initialRef, initialStamp);
     }
@@ -79,6 +82,7 @@ public class AtomicStampedReference<V> {
      *
      * @return the current value of the reference
      */
+    // 获取实际的引用
     public V getReference() {
         return pair.reference;
     }
@@ -88,6 +92,7 @@ public class AtomicStampedReference<V> {
      *
      * @return the current value of the stamp
      */
+    // 获取int戳
     public int getStamp() {
         return pair.stamp;
     }
@@ -100,6 +105,7 @@ public class AtomicStampedReference<V> {
      * {@code stampholder[0]} will hold the value of the stamp.
      * @return the current value of the reference
      */
+    // 通过返回值获取reference值和通过形参获取stamp值
     public V get(int[] stampHolder) {
         Pair<V> pair = this.pair;
         stampHolder[0] = pair.stamp;
@@ -122,6 +128,7 @@ public class AtomicStampedReference<V> {
      * @param newStamp the new value for the stamp
      * @return {@code true} if successful
      */
+    // 虚弱的先比较后设置值
     public boolean weakCompareAndSet(V   expectedReference,
                                      V   newReference,
                                      int expectedStamp,
@@ -142,6 +149,7 @@ public class AtomicStampedReference<V> {
      * @param newStamp the new value for the stamp
      * @return {@code true} if successful
      */
+    // 使用newReference和newStamp原子地更新Pair（更新前需要先与期望值作比对）
     public boolean compareAndSet(V   expectedReference,
                                  V   newReference,
                                  int expectedStamp,
@@ -161,6 +169,7 @@ public class AtomicStampedReference<V> {
      * @param newReference the new value for the reference
      * @param newStamp the new value for the stamp
      */
+    // 设置原子变量的引用和int戳
     public void set(V newReference, int newStamp) {
         Pair<V> current = pair;
         if (newReference != current.reference || newStamp != current.stamp)
@@ -180,6 +189,7 @@ public class AtomicStampedReference<V> {
      * @param newStamp the new value for the stamp
      * @return {@code true} if successful
      */
+    // 如果当前引用reference与期望引用expectedReference一致，则使用newStamp原子地更新pair
     public boolean attemptStamp(V expectedReference, int newStamp) {
         Pair<V> current = pair;
         return
@@ -194,6 +204,7 @@ public class AtomicStampedReference<V> {
     private static final long pairOffset =
         objectFieldOffset(UNSAFE, "pair", AtomicStampedReference.class);
 
+    // 原子地更新pair，返回值指示是否更新成功
     private boolean casPair(Pair<V> cmp, Pair<V> val) {
         return UNSAFE.compareAndSwapObject(this, pairOffset, cmp, val);
     }
