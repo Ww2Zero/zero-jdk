@@ -24,4 +24,10 @@ public class Assert {
             throw new RuntimeException("check error");
         }
     }
+
+    public static void isNotEquals(Object a, Object b) {
+        if (Objects.equals(a, b)) {
+            throw new RuntimeException("check error");
+        }
+    }
 }
